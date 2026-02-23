@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Global Styles
+ * Minimal - rely on Tailwind utility classes for consistency
+ * Keep custom CSS to an absolute minimum
+ */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-900;
+  }
+}
+
+@layer components {
+  /**
+   * Container for consistent max-width across pages
+   * Use this class for main content areas
+   */
+  .container-max {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /**
+   * Utility for centering flex content
+   * Common pattern in this design system
+   */
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+}
