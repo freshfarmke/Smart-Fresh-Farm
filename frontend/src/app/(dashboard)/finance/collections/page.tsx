@@ -1,6 +1,5 @@
 "use client";
 
-import React from 'react';
 import { MoreHorizontal, Edit2 } from 'lucide-react';
 
 export default function CollectionsPage() {

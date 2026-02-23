@@ -1,15 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users,
   CheckCircle,
   Clock,
-  Phone,
   Plus,
-  Save,
-  Search,
   Filter,
   ArrowLeft
 } from 'lucide-react';

@@ -10,8 +10,8 @@ export default function BatchDetailsPage() {
   const params = useParams();
   const batchId = params.id;
 
-  const [batch, setBatch] = useState(null);
-  const [batchProducts, setBatchProducts] = useState([]);
+  const [batch, setBatch] = useState<any>(null);
+  const [batchProducts, setBatchProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);

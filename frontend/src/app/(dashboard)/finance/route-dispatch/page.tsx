@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Save, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -8,7 +8,6 @@ import {
 } from '@/lib/api/production';
 import { getAllRouteRiders, createRouteRider, recordRouteReturn, getAllDispatches, getDispatchWithProducts } from '@/lib/api/routes';
 import { getAllProducts } from '@/lib/api/products';
-import { supabase } from '@/lib/supabase/client';
 
 /**
  * Finance: Route Dispatch
@@ -19,17 +18,17 @@ import { supabase } from '@/lib/supabase/client';
  */
 export default function RouteDispatchPage() {
   const router = useRouter();
-  const [batches, setBatches] = useState<any[]>([]);
-  const [riders, setRiders] = useState<any[]>([]);
+  const [_batches, _setBatches] = useState<any[]>([]);
+  const [_riders, _setRiders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [dispatches, setDispatches] = useState<any[]>([]);
   const [dispatchDetailsCache, setDispatchDetailsCache] = useState<Record<string, any>>({});
 
-  const [selectedBatch, setSelectedBatch] = useState('');
-  const [selectedRider, setSelectedRider] = useState('');
-  const [allocations, setAllocations] = useState<Record<string, number>>({});
-  const [notes, setNotes] = useState('');
-  const [dispatchDate, setDispatchDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [_selectedBatch, _setSelectedBatch] = useState('');
+  const [_selectedRider, _setSelectedRider] = useState('');
+  const [_allocations, setAllocations] = useState<Record<string, number>>({});
+  const [_notes, _setNotes] = useState('');
+  const [_dispatchDate, _setDispatchDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   const [selectedDispatch, setSelectedDispatch] = useState('');
   const [returns, setReturns] = useState<Record<string, { quantity_returned: number; reason: string }>>({});
@@ -42,9 +41,9 @@ export default function RouteDispatchPage() {
   useEffect(() => {
     async function load() {
       const b = await getAllBatches();
-      if (b.success) setBatches(b.data || []);
+      if (b.success) _setBatches(b.data || []);
       const r = await getAllRouteRiders();
-      if (r.success) setRiders(r.data || []);
+      if (r.success) _setRiders(r.data || []);
       const p = await getAllProducts();
       if (p.success) {
         setProducts(p.data || []);
@@ -61,9 +60,9 @@ export default function RouteDispatchPage() {
     load();
   }, []);
 
-  const handleAllocationChange = (productId: string, value: string) => {
-    setAllocations((prev) => ({ ...prev, [productId]: Math.max(0, parseInt(value || '0')) }));
-  };
+  // const handleAllocationChange = (productId: string, value: string) => {
+  //   setAllocations((prev) => ({ ...prev, [productId]: Math.max(0, parseInt(value || '0')) }));
+  // };
 
   const handleReturnChange = (productId: string, field: 'quantity_returned' | 'reason', value: string) => {
     setReturns((prev) => ({ ...prev, [productId]: { ...prev[productId], [field]: field === 'quantity_returned' ? Math.max(0, parseInt(value || '0')) : value } }));
@@ -78,7 +77,7 @@ export default function RouteDispatchPage() {
       if (!res.success) throw new Error(res.error?.message || 'Failed creating rider');
       alert('Route rider created');
       const r = await getAllRouteRiders();
-      if (r.success) setRiders(r.data || []);
+      if (r.success) _setRiders(r.data || []);
     } catch (e: any) {
       console.error(e);
       alert(e?.message || 'Failed to create route rider');

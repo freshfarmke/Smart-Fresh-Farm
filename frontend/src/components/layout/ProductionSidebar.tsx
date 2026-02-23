@@ -99,4 +99,4 @@ export function ProductionSidebar({ currentPath }: { currentPath?: string }) {
   );
 }
 
-export default ProductionSidebar;
+export { ProductionSidebar };

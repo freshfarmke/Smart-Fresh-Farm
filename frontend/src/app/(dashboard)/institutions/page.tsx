@@ -1,30 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import {
-  Building2,
-  Users,
   Phone,
   MapPin,
-  DollarSign,
-  Calendar,
-  Package,
   Plus,
   Search,
   Filter,
   MoreVertical,
   Eye,
   Edit,
-  Trash2,
-  ArrowLeft,
   Clock,
   AlertCircle,
   CheckCircle2,
-  TrendingUp,
-  Settings,
-  LogOut,
-  XCircle
 } from 'lucide-react';
 
 interface Institution {
@@ -56,10 +44,8 @@ interface Product {
 }
 
 const InstitutionsManagement = () => {
-  const router = useRouter();
-  const [selectedInstitution, setSelectedInstitution] = useState('');
   const [showAddInstitution, setShowAddInstitution] = useState(false);
-  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [_showCreateOrder, _setShowCreateOrder] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form states
@@ -230,7 +216,7 @@ const InstitutionsManagement = () => {
 
   const handleCreateOrder = () => {
     console.log('Creating order:', newOrder);
-    setShowCreateOrder(false);
+    _setShowCreateOrder(false);
     setNewOrder({
       institution: '',
       products: { whiteBread: 0, croissants: 0, muffins: 0, chocolateCake: 0 },
