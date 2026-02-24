@@ -12,6 +12,7 @@ import type {
   CreateBatchInput,
   AddProductToBatchInput,
   ApiResponse,
+  CreateProductionBatchInput,
 } from '@/types/database';
 
 /**
@@ -247,7 +248,7 @@ export async function getAllProductionBatches(): Promise<ApiResponse<any[]>> {
   try {
     const { data, error } = await supabase
       .from('production_batches')
-      .select('*, product:products(*)')
+      .select('*, batch_products(*, product:products(*))')
       .order('created_at', { ascending: false });
 
     if (error) throw error;

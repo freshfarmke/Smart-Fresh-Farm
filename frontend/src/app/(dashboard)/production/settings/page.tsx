@@ -1,4 +1,6 @@
+"use client";
 import React from 'react';
+import ProductionOperationsSettings from '@/components/production/ProductionOperationsSettings';
 
 export default function ProductionSettingsPage() {
   return (
@@ -8,9 +10,7 @@ export default function ProductionSettingsPage() {
         <p className="text-sm text-gray-600 mt-1">Production module preferences and configurations</p>
       </div>
 
-      <div className="bg-white rounded-lg border p-6">
-        <p className="text-gray-600">Placeholder for Production settings. Add configuration controls here.</p>
-      </div>
+      <ProductionOperationsSettings />
     </div>
   );
 }

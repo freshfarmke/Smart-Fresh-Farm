@@ -3,54 +3,34 @@
 import { useState } from 'react';
 import { Package, Plus, Minus } from 'lucide-react';
 
+
 interface TransferTableProps {
-  onTransfer?: (product: string, quantity: number) => void;
+  onTransfer?: (productKey: string, quantity: number) => void;
+  products: { id: string; label: string }[];
+  productionStock: Record<string, number>;
 }
 
-export function TransferTable({ onTransfer }: TransferTableProps) {
-  const productionStock = {
-    bread: 320,
-    queenCakes: 125,
-    buns: 200,
-  };
-
-  const products = [
-    { id: 'bread', label: 'Bread' },
-    { id: 'queenCakes', label: 'Queen Cakes' },
-    { id: 'buns', label: 'Buns' },
-  ];
-
-  const [transferQuantities, setTransferQuantities] = useState({
-    bread: 0,
-    queenCakes: 0,
-    buns: 0,
-  });
+export function TransferTable({ onTransfer, products, productionStock }: TransferTableProps) {
+  const [transferQuantities, setTransferQuantities] = useState<Record<string, number>>(
+    () => products.reduce((acc, p) => ({ ...acc, [p.id]: 0 }), {})
+  );
 
   const handleIncrement = (product: string) => {
     setTransferQuantities((prev) => ({
       ...prev,
-      [product]: Math.min(
-        prev[product as keyof typeof prev] + 10,
-        productionStock[product as keyof typeof productionStock]
-      ),
+      [product]: Math.min(prev[product] + 10, productionStock[product] ?? 0),
     }));
   };
 
   const handleDecrement = (product: string) => {
     setTransferQuantities((prev) => ({
       ...prev,
-      [product]: Math.max(prev[product as keyof typeof prev] - 10, 0),
+      [product]: Math.max(prev[product] - 10, 0),
     }));
   };
 
   const handleChange = (product: string, value: string) => {
-    const quantity = Math.max(
-      0,
-      Math.min(
-        parseInt(value) || 0,
-        productionStock[product as keyof typeof productionStock]
-      )
-    );
+    const quantity = Math.max(0, Math.min(parseInt(value) || 0, productionStock[product] ?? 0));
     setTransferQuantities((prev) => ({
       ...prev,
       [product]: quantity,
@@ -58,7 +38,7 @@ export function TransferTable({ onTransfer }: TransferTableProps) {
   };
 
   const handleConfirmTransfer = (product: string) => {
-    const quantity = transferQuantities[product as keyof typeof transferQuantities];
+    const quantity = transferQuantities[product];
     if (quantity > 0) {
       onTransfer?.(product, quantity);
       setTransferQuantities((prev) => ({
@@ -106,7 +86,7 @@ export function TransferTable({ onTransfer }: TransferTableProps) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="text-sm font-medium text-gray-900">
-                    {productionStock[product.id as keyof typeof productionStock]} units
+                    {productionStock[product.id] ?? 0} units
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -120,8 +100,8 @@ export function TransferTable({ onTransfer }: TransferTableProps) {
                     <input
                       type="number"
                       min="0"
-                      max={productionStock[product.id as keyof typeof productionStock]}
-                      value={transferQuantities[product.id as keyof typeof transferQuantities]}
+                      max={productionStock[product.id] ?? 0}
+                      value={transferQuantities[product.id] ?? 0}
                       onChange={(e) => handleChange(product.id, e.target.value)}
                       className="w-20 px-2 py-1 text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                     />
@@ -136,11 +116,9 @@ export function TransferTable({ onTransfer }: TransferTableProps) {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <button
                     onClick={() => handleConfirmTransfer(product.id)}
-                    disabled={
-                      transferQuantities[product.id as keyof typeof transferQuantities] <= 0
-                    }
+                    disabled={transferQuantities[product.id] <= 0}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                      transferQuantities[product.id as keyof typeof transferQuantities] > 0
+                      (transferQuantities[product.id] ?? 0) > 0
                         ? 'bg-amber-700 text-white hover:bg-amber-800'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}

@@ -6,6 +6,8 @@ import { ShopStockCard } from '@/components/shop/StockCard';
 import { TransferTable } from '@/components/shop/TransferTable';
 import { StockSummary } from '@/components/shop/StockSummary';
 import { TransferHistory } from '@/components/shop/TransferHistory';
+import { getShopStock, getShopTransfers } from '@/lib/api/shop';
+import { getAllProducts } from '@/lib/api/products';
 
 interface TransferHistoryItem {
   time: string;
@@ -19,26 +21,71 @@ interface TransferHistoryItem {
  * Manages stock transfers from production to shop
  */
 export default function ShopManagementPage() {
-  const [shopStock, setShopStock] = useState({
-    bread: 245,
-    queenCakes: 89,
-    buns: 156,
-  });
+  const [shopStock, setShopStock] = useState<Record<string, number>>({});
+  const [productionStock, setProductionStock] = useState<Record<string, number>>({});
+  const [availableProducts, setAvailableProducts] = useState<{ id: string; label: string }[]>([]);
 
   const [transfers, setTransfers] = useState<TransferHistoryItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Simulate live updates
+  // Load shop and production stock + products
   useEffect(() => {
-    const interval = setInterval(() => {
-      setShopStock((prev) => ({
-        bread: Math.max(50, prev.bread + Math.floor(Math.random() * 5) - 2),
-        queenCakes: Math.max(30, prev.queenCakes + Math.floor(Math.random() * 3) - 1),
-        buns: Math.max(40, prev.buns + Math.floor(Math.random() * 4) - 1),
-      }));
-    }, 30000);
+    let mounted = true;
+    async function load() {
+      try {
+        const [stockRes, transfersRes, prodRes] = await Promise.all([getShopStock(), getShopTransfers(), getAllProducts()]);
 
-    return () => clearInterval(interval);
+        if (!mounted) return;
+
+        // helper to create a stable key from product name
+        const slugKey = (name: string) =>
+          name
+            .toString()
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/[^a-z0-9]/g, '');
+
+        // map products
+        if (prodRes.success) {
+          setAvailableProducts((prodRes.data || []).map((p:any) => ({ id: slugKey(p.name), label: p.name })));
+        }
+
+        if (stockRes.success) {
+          // build shop and production stock maps keyed by normalized product name
+          const shopMap: Record<string, number> = {};
+          const prodMap: Record<string, number> = {};
+
+          (stockRes.data || []).forEach((row:any) => {
+            const name = row.product?.name || String(row.product_id);
+            const key = slugKey(name);
+            const qty = Number(row.quantity_available || 0);
+            if (row.location === 'shop') shopMap[key] = qty;
+            if (row.location === 'production') prodMap[key] = qty;
+          });
+
+          setShopStock(shopMap);
+          setProductionStock(prodMap);
+        }
+
+        if (transfersRes.success) {
+          // map transfers to UI shape using nested products when available
+          setTransfers((transfersRes.data || []).map((t:any) => {
+            const first = (t.shop_transfer_products || [])[0];
+            return {
+              time: new Date(t.created_at).toLocaleTimeString(),
+              product: first?.product?.name || '',
+              quantity: Number(first?.quantity || 0),
+              transferredBy: '',
+            };
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load shop data', err);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
   }, []);
 
   const handleRefresh = async () => {
@@ -103,22 +150,32 @@ export default function ShopManagementPage() {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <ShopStockCard title="Opening Bread Stock" quantity={shopStock.bread} />
-            <ShopStockCard title="Opening Queen Cake Stock" quantity={shopStock.queenCakes} />
-            <ShopStockCard title="Opening Buns Stock" quantity={shopStock.buns} />
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {(() => {
+                const desired = ['Bread', 'Queen Cakes', 'Buns', 'Mavin'];
+                const items = desired.map((label) => {
+                  const key = label.toString().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+                  return { key, label };
+                });
+
+                // render up to 3-4 prioritized items; fallback to availableProducts if missing
+                return items.slice(0, 4).map((it) => (
+                  <ShopStockCard key={it.key} title={`Opening ${it.label} Stock`} quantity={shopStock[it.key] ?? 0} />
+                ));
+              })()}
+            </div>
         </div>
       </div>
 
       {/* Transfer From Production Table */}
-      <TransferTable onTransfer={handleTransfer} />
+        <TransferTable onTransfer={handleTransfer} products={availableProducts} productionStock={productionStock} />
 
       {/* Stock Summary */}
       <StockSummary
-        bread={shopStock.bread}
-        queenCakes={shopStock.queenCakes}
-        buns={shopStock.buns}
+        bread={shopStock['bread'] ?? 0}
+        queenCakes={shopStock['queencakes'] ?? 0}
+        buns={shopStock['buns'] ?? 0}
+        mavin={shopStock['mavin'] ?? 0}
       />
 
       {/* Transfer History */}

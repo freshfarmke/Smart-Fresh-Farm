@@ -1,13 +1,17 @@
 {
   "version": 2,
   "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next/output",
   "framework": "nextjs",
   "cleanUrls": true,
-  "rewrites": [
+  "headers": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
     }
   ],
   "headers": [

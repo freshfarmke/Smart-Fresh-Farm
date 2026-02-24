@@ -122,8 +122,8 @@ export default function NewBatchPage() {
 
       if (productsError) throw productsError;
 
-      // Redirect to production batches list
-      router.push(`/production/production_batches`);
+      // Redirect to production dashboard
+      router.push(`/production`);
     } catch (err) {
       console.error('Error creating batch:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to create batch';

@@ -20,8 +20,7 @@ export function ProductionSidebar({ currentPath }: { currentPath?: string }) {
 
   const navItems = [
     { name: "Dashboard", href: "/production", icon: Home },
-    { name: "Batches", href: "/production/batches", icon: Package },
-    { name: "Routes", href: "/production/routes", icon: Truck },
+    // Removed Batches and Routes pages (not used)
     { name: "Route Dispatch", href: "/production/dispatch", icon: Truck },
     { name: "Institutions", href: "/institutions", icon: Building2 },
     { name: "Shop", href: "/production/shop", icon: Store },
@@ -43,7 +42,7 @@ export function ProductionSidebar({ currentPath }: { currentPath?: string }) {
   };
 
   return (
-    <aside className="w-64 h-screen bg-[#7A4A2A] text-white flex flex-col justify-between shadow-xl">
+    <aside className="w-64 sticky top-0 h-screen bg-[#7A4A2A] text-white flex flex-col justify-between shadow-xl">
       {/* Top Section */}
       <div>
         {/* Brand */}

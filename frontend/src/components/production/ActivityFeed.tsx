@@ -1,15 +1,83 @@
 'use client';
 
 import { CheckCircle2, Truck, AlertCircle, MessageSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getAllProductionBatches } from '@/lib/api/production';
+import { getAllDispatches } from '@/lib/api/routes';
+import { supabase } from '@/lib/supabase/client';
+
+type Activity = { type: string; message: string; time: string; ts: string; icon: any };
 
 export function ActivityFeed() {
-  const activities = [
-    { type: 'completed', message: 'Batch #B001 completed successfully', time: '10:30 AM', icon: CheckCircle2 },
-    { type: 'dispatched', message: 'Dispatch completed for Route A-12', time: '09:45 AM', icon: Truck },
-    { type: 'alert', message: 'Return recorded from Route B-05', time: '09:15 AM', icon: AlertCircle },
-    { type: 'completed', message: 'Batch #B003 completed and logged', time: '08:30 AM', icon: CheckCircle2 },
-    { type: 'info', message: 'New batch created: Croissants batch', time: '08:00 AM', icon: MessageSquare },
-  ];
+  const [activities, setActivities] = useState<Activity[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const results: Activity[] = [];
+
+        // Production batches (created/completed)
+        const pb = await getAllProductionBatches();
+        if (pb.success) {
+          (pb.data || []).slice(0, 10).forEach((b: any) => {
+            const ts = b.created_at || b.production_date || null;
+            results.push({
+              type: b.status === 'completed' ? 'completed' : 'info',
+              message: `Batch ${b.batch_code || b.batch_number || b.id} (${b.product?.name ?? b.product_id}) - ${b.status || 'created'}`,
+              time: ts ? new Date(ts).toLocaleString() : '—',
+              ts: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+              icon: b.status === 'completed' ? CheckCircle2 : MessageSquare,
+            });
+          });
+        }
+
+        // Dispatches
+        const d = await getAllDispatches();
+        if (d.success) {
+          (d.data || []).slice(0, 10).forEach((disp: any) => {
+            const ts = disp.dispatch_date || disp.created_at || null;
+            results.push({
+              type: 'dispatched',
+              message: `Dispatch ${disp.id} assigned to ${disp.rider?.nickname || disp.rider?.full_name || disp.rider?.name || disp.rider?.id || 'Rider'}`,
+              time: ts ? new Date(ts).toLocaleString() : '—',
+              ts: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+              icon: Truck,
+            });
+          });
+        }
+
+        // Returns
+        const { data: returnsData, error: returnsError } = await supabase
+          .from('route_returns')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!returnsError && returnsData) {
+          returnsData.forEach((r: any) => {
+            const ts = r.created_at || r.return_date || null;
+            results.push({
+              type: 'alert',
+              message: `Return recorded for dispatch ${r.dispatch_id || r.id}`,
+              time: ts ? new Date(ts).toLocaleString() : '—',
+              ts: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+              icon: AlertCircle,
+            });
+          });
+        }
+
+        // Sort by timestamp desc and take top 6
+        results.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+        if (mounted) setActivities(results.slice(0, 6));
+      } catch (err) {
+        console.error('Failed to load activity feed', err);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const getIconColor = (type: string) => {
     switch (type) {
@@ -42,6 +110,9 @@ export function ActivityFeed() {
             </div>
           );
         })}
+        {activities.length === 0 && (
+          <div className="text-gray-500">No recent activity</div>
+        )}
       </div>
     </div>
   );

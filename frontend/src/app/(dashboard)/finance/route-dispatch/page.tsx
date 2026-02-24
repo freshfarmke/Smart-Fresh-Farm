@@ -64,7 +64,7 @@ export default function RouteDispatchPage() {
         // Fetch products for each dispatch
         const cache: Record<string, any> = {};
         for (const dispatch of d.data || []) {
-          const details = await getDispatchWithProducts(dispatch.id);
+          const details = await getDispatchWithProducts(String(dispatch.id));
           if (details.success) {
             cache[dispatch.id] = details.data;
           }

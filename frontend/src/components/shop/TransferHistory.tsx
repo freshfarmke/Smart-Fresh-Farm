@@ -14,15 +14,7 @@ interface TransferHistoryProps {
 }
 
 export function TransferHistory({ transfers }: TransferHistoryProps) {
-  const defaultTransfers: TransferHistoryItem[] = [
-    { time: '08:30 AM', product: 'Bread', quantity: 50, transferredBy: 'John Baker' },
-    { time: '09:15 AM', product: 'Queen Cakes', quantity: 25, transferredBy: 'Mike Wilson' },
-    { time: '10:45 AM', product: 'Buns', quantity: 30, transferredBy: 'David Smith' },
-    { time: '11:20 AM', product: 'Bread', quantity: 40, transferredBy: 'Sarah Johnson' },
-    { time: '12:00 PM', product: 'Queen Cakes', quantity: 15, transferredBy: 'John Baker' },
-  ];
-
-  const displayTransfers = transfers.length > 0 ? transfers : defaultTransfers;
+  const displayTransfers = transfers;
 
   const getInitials = (name: string) => {
     return name

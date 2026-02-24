@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@/components/ui';
-import { VALIDATION } from '@/lib/constants';
+import { VALIDATION, ROUTES } from '@/lib/constants';
 import { supabase } from '@/lib/supabase/client';
 
 /**
@@ -62,7 +62,7 @@ export function LoginForm() {
 
       if (profileError) {
         console.warn('Profile fetch error:', profileError.message);
-        router.push('/dashboard'); // fallback
+        router.push(ROUTES.DASHBOARD); // fallback
         return;
       }
 
@@ -71,7 +71,7 @@ export function LoginForm() {
       if (role === 'admin') router.push('/admin');
       else if (role === 'finance') router.push('/finance');
       else if (role === 'production') router.push('/production');
-      else router.push('/dashboard');
+      else router.push(ROUTES.DASHBOARD);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');

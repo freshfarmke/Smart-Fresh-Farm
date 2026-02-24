@@ -87,7 +87,7 @@ export function RegisterForm() {
       }
 
       // Redirect after successful registration
-      setTimeout(() => router.push(ROUTES.DASHBOARD), 800);
+      setTimeout(() => router.push(ROUTES.PRODUCTION), 800);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');

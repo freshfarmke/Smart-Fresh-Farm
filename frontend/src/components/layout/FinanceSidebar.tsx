@@ -33,7 +33,7 @@ export function FinanceSidebar({ currentPath }: { currentPath?: string }) {
   };
 
   return (
-    <aside className="w-64 h-screen bg-[#F5F2EE] border-r flex flex-col justify-between">
+    <aside className="w-64 sticky top-0 h-screen bg-[#F5F2EE] border-r flex flex-col justify-between">
       <div>
         <div className="flex items-center gap-3 px-6 py-6 border-b">
           <div className="bg-[#6B3E26] text-white p-2 rounded-lg">

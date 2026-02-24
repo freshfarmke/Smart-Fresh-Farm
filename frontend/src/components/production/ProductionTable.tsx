@@ -79,7 +79,7 @@ export function ProductionTable() {
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Batch Code</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Product</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Product(s)</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Produced</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Remaining</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Created At</th>
@@ -91,15 +91,31 @@ export function ProductionTable() {
                 <td colSpan={5} className="p-6 text-center text-gray-500">No production batches created today</td>
               </tr>
             ) : (
-              batches.map((b) => (
-                <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                  <td className="py-4 px-4 font-medium text-gray-900">{b.batch_code}</td>
-                  <td className="py-4 px-4 text-gray-700">{b.product?.name ?? b.product_id}</td>
-                  <td className="py-4 px-4 text-gray-700 font-medium">{b.quantity_produced}</td>
-                  <td className="py-4 px-4 text-gray-700 font-medium">{b.quantity_remaining}</td>
-                  <td className="py-4 px-4 text-gray-600 text-xs">{b.created_at ? new Date(b.created_at).toLocaleTimeString() : '-'}</td>
-                </tr>
-              ))
+              batches.map((b) => {
+                // Support two shapes: production_batches with batch_products join, or older single-product rows
+                const batchProducts = b.batch_products || b.products || [];
+                const productNames = batchProducts.length > 0
+                  ? batchProducts.map((bp: any) => bp.product?.name || bp.product_id).join(', ')
+                  : (b.product?.name ?? b.product_id ?? '—');
+
+                const totalProduced = batchProducts.length > 0
+                  ? batchProducts.reduce((s: number, bp: any) => s + Number(bp.quantity_produced || 0), 0)
+                  : (Number(b.quantity_produced || 0));
+
+                const totalRemaining = batchProducts.length > 0
+                  ? batchProducts.reduce((s: number, bp: any) => s + Number(bp.quantity_remaining || 0 || 0), 0)
+                  : (Number(b.quantity_remaining || 0));
+
+                return (
+                  <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                    <td className="py-4 px-4 font-medium text-gray-900">{b.batch_code || b.batch_number || b.id}</td>
+                    <td className="py-4 px-4 text-gray-700">{productNames}</td>
+                    <td className="py-4 px-4 text-gray-700 font-medium">{totalProduced || '—'}</td>
+                    <td className="py-4 px-4 text-gray-700 font-medium">{(totalRemaining || totalRemaining === 0) ? totalRemaining : '—'}</td>
+                    <td className="py-4 px-4 text-gray-600 text-xs">{b.created_at ? new Date(b.created_at).toLocaleTimeString() : '-'}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Phone,
   MapPin,
@@ -15,32 +15,37 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+import { getAllInstitutions, createInstitution, getAllInstitutionOrders, createInstitutionOrder } from '@/lib/api/institutions';
+import { getAllProducts } from '@/lib/api/products';
+
 interface Institution {
-  id: number;
+  id: number | string;
   name: string;
-  contactPerson: string;
-  phone: string;
-  address: string;
-  orders: number;
-  balance: number;
-  balanceStatus: 'positive' | 'overdue';
-  type: string;
+  contact_person?: string | null;
+  contactPerson?: string;
+  phone?: string;
+  address?: string;
+  orders?: number;
+  balance?: number;
+  balanceStatus?: 'positive' | 'overdue';
+  type?: string;
 }
 
 interface Order {
   id: string;
-  institution: string;
-  products: { name: string; quantity: number }[];
+  institution_id?: number | string;
+  institution?: string;
+  products: { product_id?: string | number; name: string; quantity: number }[];
   total: number;
-  status: 'delivered' | 'in-progress' | 'pending';
-  date: string;
+  status: 'delivered' | 'in-progress' | 'pending' | string;
+  date?: string;
 }
 
 interface Product {
-  id: string;
+  id: string | number;
   name: string;
   price: number;
-  unit: string;
+  unit?: string;
 }
 
 const InstitutionsManagement = () => {
@@ -56,130 +61,16 @@ const InstitutionsManagement = () => {
     address: ''
   });
 
-  const [newOrder, setNewOrder] = useState({
+  const [newOrder, setNewOrder] = useState<{ institution: string; products: Record<string, number>; deliveryDate: string; totalAmount: number }>({
     institution: '',
-    products: {
-      whiteBread: 0,
-      croissants: 0,
-      muffins: 0,
-      chocolateCake: 0
-    },
+    products: {},
     deliveryDate: '',
-    totalAmount: 0
+    totalAmount: 0,
   });
 
-  // Sample data
-  const institutions: Institution[] = [
-    {
-      id: 1,
-      name: 'Sunshine Elementary',
-      contactPerson: 'Maria Rodriguez',
-      phone: '(555) 123-4567',
-      address: '123 School St, Downtown',
-      orders: 12,
-      balance: 2450,
-      balanceStatus: 'positive',
-      type: 'school'
-    },
-    {
-      id: 2,
-      name: 'City Hospital',
-      contactPerson: 'Dr. James Wilson',
-      phone: '(555) 987-6543',
-      address: '456 Medical Ave, Central',
-      orders: 8,
-      balance: 1890,
-      balanceStatus: 'positive',
-      type: 'hospital'
-    },
-    {
-      id: 3,
-      name: 'Tech University',
-      contactPerson: 'Sarah Chen',
-      phone: '(555) 456-7890',
-      address: '789 Campus Dr, North',
-      orders: 2,
-      balance: -340,
-      balanceStatus: 'overdue',
-      type: 'university'
-    },
-    {
-      id: 4,
-      name: 'Riverside Cafe',
-      contactPerson: 'Michael Brown',
-      phone: '(555) 234-5678',
-      address: '321 River St, Westside',
-      orders: 5,
-      balance: 890,
-      balanceStatus: 'positive',
-      type: 'cafe'
-    },
-    {
-      id: 5,
-      name: 'Community College',
-      contactPerson: 'Prof. Emily Davis',
-      phone: '(555) 876-5432',
-      address: '555 Education Blvd, Eastside',
-      orders: 3,
-      balance: 450,
-      balanceStatus: 'positive',
-      type: 'university'
-    }
-  ];
-
-  const recentOrders: Order[] = [
-    {
-      id: '#ORD-001',
-      institution: 'Sunshine Elementary',
-      products: [
-        { name: 'White Bread', quantity: 50 },
-        { name: 'Croissants', quantity: 24 }
-      ],
-      total: 167.0,
-      status: 'delivered',
-      date: '2026-01-19'
-    },
-    {
-      id: '#ORD-002',
-      institution: 'City Hospital',
-      products: [
-        { name: 'Muffins', quantity: 36 },
-        { name: 'Croissants', quantity: 48 }
-      ],
-      total: 192.0,
-      status: 'in-progress',
-      date: '2026-01-19'
-    },
-    {
-      id: '#ORD-003',
-      institution: 'Tech University',
-      products: [
-        { name: 'White Bread', quantity: 100 },
-        { name: 'Chocolate Cake', quantity: 10 }
-      ],
-      total: 450.0,
-      status: 'pending',
-      date: '2026-01-20'
-    },
-    {
-      id: '#ORD-004',
-      institution: 'Riverside Cafe',
-      products: [
-        { name: 'Croissants', quantity: 60 },
-        { name: 'Muffins', quantity: 24 }
-      ],
-      total: 210.0,
-      status: 'delivered',
-      date: '2026-01-18'
-    }
-  ];
-
-  const products: Product[] = [
-    { id: 'whiteBread', name: 'White Bread', price: 2.5, unit: 'loaf' },
-    { id: 'croissants', name: 'Croissants', price: 3.0, unit: 'piece' },
-    { id: 'muffins', name: 'Muffins', price: 2.75, unit: 'piece' },
-    { id: 'chocolateCake', name: 'Chocolate Cake', price: 25.0, unit: 'cake' }
-  ];
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   const handleInstitutionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewInstitution({
@@ -188,41 +79,81 @@ const InstitutionsManagement = () => {
     });
   };
 
-  const handleOrderProductChange = (product: string, value: string) => {
+  const handleOrderProductChange = (productId: string | number, value: string) => {
     const quantity = Math.max(0, parseInt(value) || 0);
     const updatedProducts = {
       ...newOrder.products,
-      [product as keyof typeof newOrder.products]: quantity
+      [String(productId)]: quantity,
     };
 
     // Calculate total
     const total = Object.entries(updatedProducts).reduce((sum, [key, qty]) => {
-      const prod = products.find(p => p.id === key);
-      return sum + (prod ? prod.price * qty : 0);
+      const prod = products.find((p) => String(p.id) === key);
+      return sum + (prod ? prod.price * Number(qty) : 0);
     }, 0);
 
     setNewOrder({
       ...newOrder,
-      products: updatedProducts as typeof newOrder.products,
-      totalAmount: total
+      products: updatedProducts,
+      totalAmount: total,
     });
   };
 
   const handleSaveInstitution = () => {
-    console.log('Saving institution:', newInstitution);
-    setShowAddInstitution(false);
-    setNewInstitution({ name: '', contactPerson: '', phone: '', address: '' });
+    (async () => {
+      try {
+        const payload = {
+          name: newInstitution.name,
+          contact_person: newInstitution.contactPerson || newInstitution.contact_person || null,
+          phone: newInstitution.phone || null,
+          address: newInstitution.address || null,
+        };
+
+        const res = await createInstitution(payload as any);
+        if (!res.success) throw new Error(res.error?.message || 'Failed to create institution');
+        // prepend new institution
+        setInstitutions((prev) => [res.data as any, ...prev]);
+        setShowAddInstitution(false);
+        setNewInstitution({ name: '', contactPerson: '', phone: '', address: '' });
+      } catch (err) {
+        console.error('Create institution failed', err);
+        alert(err instanceof Error ? err.message : 'Failed to create institution');
+      }
+    })();
   };
 
-  const handleCreateOrder = () => {
-    console.log('Creating order:', newOrder);
-    _setShowCreateOrder(false);
-    setNewOrder({
-      institution: '',
-      products: { whiteBread: 0, croissants: 0, muffins: 0, chocolateCake: 0 },
-      deliveryDate: '',
-      totalAmount: 0
-    });
+  const handleCreateOrder = async () => {
+    try {
+      if (!newOrder.institution) return alert('Select an institution');
+
+      const productsPayload = Object.entries(newOrder.products)
+        .filter(([, qty]) => Number(qty) > 0)
+        .map(([product_id, quantity]) => {
+          const prod = products.find((p) => String(p.id) === String(product_id));
+          return {
+            product_id: product_id,
+            quantity_ordered: Number(quantity),
+            unit_price: prod ? Number(prod.price) : 0,
+          };
+        });
+
+      const payload = {
+        institution_id: String(newOrder.institution),
+        order_date: newOrder.deliveryDate || new Date().toISOString().slice(0, 10),
+        total_amount: Number(newOrder.totalAmount || 0),
+        products: productsPayload,
+      } as any;
+
+      const res = await createInstitutionOrder(payload as any);
+      if (!res.success) throw new Error(res.error?.message || 'Failed to create order');
+      // refresh recent orders list
+      setRecentOrders((prev) => [{ id: String(res.data.id), institution: institutions.find(i => String(i.id) === String(newOrder.institution))?.name || '', products: productsPayload.map(p => ({ product_id: p.product_id, name: String(p.product_id), quantity: p.quantity_ordered })), total: payload.total_amount, status: 'pending', date: payload.order_date }, ...prev]);
+      _setShowCreateOrder(false);
+      setNewOrder({ institution: '', products: {}, deliveryDate: '', totalAmount: 0 });
+    } catch (err) {
+      console.error('Create order failed', err);
+      alert(err instanceof Error ? err.message : 'Failed to create order');
+    }
   };
 
   const getBalanceColor = (balance: number, status: string) => {
@@ -258,9 +189,46 @@ const InstitutionsManagement = () => {
 
   const filteredInstitutions = institutions.filter(inst =>
     inst.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.address.toLowerCase().includes(searchTerm.toLowerCase())
+    (inst.contactPerson || inst.contact_person || '').toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (inst.address || '').toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const [insRes, prodRes, ordersRes] = await Promise.all([
+          getAllInstitutions(),
+          getAllProducts(),
+          getAllInstitutionOrders(),
+        ]);
+
+        if (mounted) {
+              if (insRes.success) setInstitutions(insRes.data || []);
+              if (prodRes.success) {
+                // Map product shape to include `price` (use retail_price as default)
+                const mapped = (prodRes.data || []).map((p:any) => ({
+                  id: p.id,
+                  name: p.name,
+                  price: Number(p.retail_price ?? p.wholesale_price ?? 0),
+                  unit: p.weight ?? undefined,
+                  // keep original fields if needed
+                  retail_price: p.retail_price,
+                  wholesale_price: p.wholesale_price,
+                }));
+
+                setProducts(mapped);
+              }
+              if (ordersRes.success) setRecentOrders((ordersRes.data || []).slice(0, 20).map((o:any) => ({ id: String(o.id), institution_id: o.institution_id, institution: '', products: [], total: Number(o.total_amount || 0), status: o.status || 'pending', date: o.order_date })));
+            }
+      } catch (err) {
+        console.error('Failed to load institutions data', err);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div>
@@ -422,7 +390,7 @@ const InstitutionsManagement = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm text-gray-900 font-medium">{institution.contactPerson}</div>
+                        <div className="text-sm text-gray-900 font-medium">{institution.contactPerson || institution.contact_person || ''}</div>
                         <div className="text-xs text-gray-600 flex items-center mt-1">
                           <Phone className="w-3 h-3 mr-1" />
                           {institution.phone}
@@ -433,9 +401,9 @@ const InstitutionsManagement = () => {
                       <span className="text-sm font-medium text-gray-900">{institution.orders} Active</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-sm font-semibold ${getBalanceColor(institution.balance, institution.balanceStatus)}`}>
-                        ${Math.abs(institution.balance).toLocaleString()}
-                        {institution.balance < 0 && ' (Overdue)'}
+                      <span className={`text-sm font-semibold ${getBalanceColor(Number(institution.balance || 0), institution.balanceStatus || '')}`}>
+                        {institution.balance !== undefined && institution.balance !== null ? `KES ${Math.abs(Number(institution.balance)).toLocaleString()}` : '—'}
+                        {Number(institution.balance || 0) < 0 && ' (Overdue)'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -496,12 +464,12 @@ const InstitutionsManagement = () => {
                   {products.map((product) => (
                     <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <span className="text-sm text-gray-700 font-medium">
-                        {product.name} <span className="text-gray-500">(${product.price}/{product.unit})</span>
+                        {product.name} <span className="text-gray-500">(KES {Number(product.price).toLocaleString()}{product.unit ? `/${product.unit}` : ''})</span>
                       </span>
                       <input
                         type="number"
                         min="0"
-                        value={newOrder.products[product.id as keyof typeof newOrder.products]}
+                        value={newOrder.products[String(product.id)] || 0}
                         onChange={(e) => handleOrderProductChange(product.id, e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm"
                         placeholder="0"
@@ -529,7 +497,7 @@ const InstitutionsManagement = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-700">Total Amount:</span>
                   <span className="text-xl font-bold text-amber-900">
-                    ${newOrder.totalAmount.toFixed(2)}
+                    KES {Number(newOrder.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </span>
                 </div>
               </div>
@@ -582,7 +550,7 @@ const InstitutionsManagement = () => {
                     </div>
                     <div className="text-right ml-4">
                       <span className="text-sm font-bold text-gray-900">
-                        ${order.total.toFixed(2)}
+                        KES {Number(order.total).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </span>
                     </div>
                   </div>
