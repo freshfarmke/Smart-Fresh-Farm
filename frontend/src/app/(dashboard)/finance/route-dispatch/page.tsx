@@ -35,8 +35,12 @@ export default function RouteDispatchPage() {
   // Create Route Rider form state
   const [newRiderName, setNewRiderName] = useState('');
   const [newRiderPhone, setNewRiderPhone] = useState('');
-  const [newRiderAssignedRoute, setNewRiderAssignedRoute] = useState('');
+  const [newRiderNickname, setNewRiderNickname] = useState('');
+  
   const [newRiderStatus, setNewRiderStatus] = useState<'active' | 'inactive'>('active');
+  const [newRiderError, setNewRiderError] = useState<string | null>(null);
+  const [isCreatingRider, setIsCreatingRider] = useState(false);
+  const [newRiderRawError, setNewRiderRawError] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -55,7 +59,18 @@ export default function RouteDispatchPage() {
         setReturns(initReturns);
       }
       const d = await getAllDispatches();
-      if (d.success) setDispatches(d.data || []);
+      if (d.success) {
+        setDispatches(d.data || []);
+        // Fetch products for each dispatch
+        const cache: Record<string, any> = {};
+        for (const dispatch of d.data || []) {
+          const details = await getDispatchWithProducts(dispatch.id);
+          if (details.success) {
+            cache[dispatch.id] = details.data;
+          }
+        }
+        setDispatchDetailsCache(cache);
+      }
     }
     load();
   }, []);
@@ -71,16 +86,30 @@ export default function RouteDispatchPage() {
   // Finance no longer creates dispatches. Dispatch creation occurs in Production.
   // Finance is responsible for creating/managing Route Riders (see handleCreateRouteRider below).
 
-  const handleCreateRouteRider = async (payload: { name: string; phone: string; assigned_route?: string; status?: string }) => {
+  const handleCreateRouteRider = async (payload: { name: string; phone: string; status?: string; nickname?: string }) => {
+    setIsCreatingRider(true);
+    setNewRiderError(null);
     try {
-      const res = await createRouteRider({ name: payload.name, phone: payload.phone, assigned_route: payload.assigned_route || null, status: payload.status === 'active' ? 'active' : 'inactive' } as any);
-      if (!res.success) throw new Error(res.error?.message || 'Failed creating rider');
-      alert('Route rider created');
+      const res = await createRouteRider({ name: payload.name, phone: payload.phone, nickname: payload.nickname || null, status: payload.status === 'active' ? 'active' : 'inactive' } as any);
+      if (!res.success) {
+        // capture full error for debugging
+        console.error('createRouteRider failed', res.error);
+        setNewRiderRawError(res.error || null);
+        const msg: string = (res.error?.message as string) || (res.error?.details && (typeof res.error.details.error === 'string' ? res.error.details.error : JSON.stringify(res.error.details))) || 'Failed creating rider';
+        setNewRiderError(msg);
+        return;
+      }
+
+      // success
+      setNewRiderError(null);
       const r = await getAllRouteRiders();
       if (r.success) _setRiders(r.data || []);
     } catch (e: any) {
       console.error(e);
-      alert(e?.message || 'Failed to create route rider');
+      setNewRiderRawError(e);
+      setNewRiderError(e?.message || 'Failed to create route rider');
+    } finally {
+      setIsCreatingRider(false);
     }
   };
   const handleSaveReturns = async () => {
@@ -119,9 +148,12 @@ export default function RouteDispatchPage() {
   };
 
   const handleSubmitRider = async () => {
-    if (!newRiderName || !newRiderPhone) { alert('Provide name and phone'); return; }
-    await handleCreateRouteRider({ name: newRiderName, phone: newRiderPhone, assigned_route: newRiderAssignedRoute, status: newRiderStatus });
-    setNewRiderName(''); setNewRiderPhone(''); setNewRiderAssignedRoute(''); setNewRiderStatus('active');
+    setNewRiderError(null);
+    if (!newRiderName || !newRiderPhone) { setNewRiderError('Provide name and phone'); return; }
+    await handleCreateRouteRider({ name: newRiderName, phone: newRiderPhone, nickname: newRiderNickname, status: newRiderStatus } as any);
+    if (!newRiderError) {
+      setNewRiderName(''); setNewRiderPhone(''); setNewRiderNickname(''); setNewRiderStatus('active');
+    }
   };
 
   return (
@@ -150,6 +182,10 @@ export default function RouteDispatchPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
               <input value={newRiderPhone} onChange={(e) => setNewRiderPhone(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nickname</label>
+              <input value={newRiderNickname} onChange={(e) => setNewRiderNickname(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -161,39 +197,55 @@ export default function RouteDispatchPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleSubmitRider} className="flex items-center space-x-2 px-4 py-2 bg-amber-700 text-white rounded-md hover:bg-amber-800 transition-colors"><Plus className="w-4 h-4" /><span>Create Rider</span></button>
-            <button onClick={() => { setNewRiderName(''); setNewRiderPhone(''); setNewRiderAssignedRoute(''); setNewRiderStatus('active'); }} className="px-4 py-2 border rounded-md">Reset</button>
+            <button onClick={handleSubmitRider} disabled={isCreatingRider} className="flex items-center space-x-2 px-4 py-2 bg-amber-700 text-white rounded-md hover:bg-amber-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" /><span>{isCreatingRider ? 'Creating…' : 'Create Rider'}</span></button>
+            <button onClick={() => { setNewRiderName(''); setNewRiderPhone(''); setNewRiderNickname(''); setNewRiderStatus('active'); }} className="px-4 py-2 border rounded-md">Reset</button>
           </div>
+          {newRiderError ? <div className="text-sm text-red-600 mt-2">{newRiderError}</div> : null}
+          {newRiderRawError ? (
+            <pre className="mt-2 p-2 bg-gray-50 border rounded text-xs text-gray-700 overflow-auto" style={{maxHeight: 240}}>{JSON.stringify(newRiderRawError, null, 2)}</pre>
+          ) : null}
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b">
           <h2 className="text-lg font-semibold text-gray-900">Dispatch Records</h2>
-          <p className="text-sm text-gray-500 mt-0.5">View dispatches created by Production</p>
+          <p className="text-sm text-gray-500 mt-0.5">Daily dispatch summary: rider, products, date, status</p>
         </div>
-        <div className="p-4">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dispatch ID</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rider</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {dispatches.map((d: any) => (
-                  <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3"><span className="text-sm text-gray-900">{d.id}</span></td>
-                    <td className="px-4 py-3"><span className="text-sm text-gray-700">{d.rider_id || d.rider || '—'}</span></td>
-                    <td className="px-4 py-3"><span className="text-sm text-gray-700">{new Date(d.dispatch_date).toLocaleDateString()}</span></td>
-                    <td className="px-4 py-3"><span className="text-sm text-gray-700">{d.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="p-4 space-y-4">
+          {dispatches.length === 0 ? (
+            <p className="text-gray-500 text-sm">No dispatches yet</p>
+          ) : (
+            dispatches.map((d: any) => (
+              <div key={d.id} className="border rounded-lg p-4 bg-gray-50 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-lg">
+                      {(d as any).rider?.nickname || (d as any).rider?.full_name || `Rider #${d.rider_id}`}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      📅 {new Date(d.dispatch_date).toLocaleDateString()} · Status: <span className={`font-medium ${d.status === 'completed' ? 'text-green-600' : d.status === 'in_transit' ? 'text-blue-600' : 'text-gray-600'}`}>{d.status}</span>
+                    </p>
+                  </div>
+                  <span className="text-xs bg-gray-200 px-2 py-1 rounded text-gray-700">ID: {d.id}</span>
+                </div>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-gray-600 uppercase mb-2">📦 Products Dispatched</p>
+                  {dispatchDetailsCache[d.id]?.products && dispatchDetailsCache[d.id].products.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {dispatchDetailsCache[d.id].products.map((dp: any) => (
+                        <div key={dp.id} className="flex justify-between text-sm bg-white p-2 rounded border-l-2 border-amber-500">
+                          <span className="text-gray-700 font-medium">{dp.product?.name || `Product #${dp.product_id}`}</span>
+                          <span className="text-amber-700 font-semibold">{dp.quantity_dispatched} units</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No products loaded. Click to fetch details...</p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

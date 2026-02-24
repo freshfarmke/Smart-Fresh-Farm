@@ -9,7 +9,8 @@ import {
   Plus,
   Filter,
   ArrowLeft,
-  Search
+  Search,
+  Phone
 } from 'lucide-react';
 import { getAllBatches } from '@/lib/api/production';
 import { getAllRouteRiders, createDispatch, addProductToDispatch } from '@/lib/api/routes';
@@ -25,11 +26,11 @@ export default function RoutesDispatch() {
   const router = useRouter();
   const [selectedBatch, setSelectedBatch] = useState('');
   const [selectedRider, setSelectedRider] = useState('');
-  const [selectedDispatch, setSelectedDispatch] = useState('');
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [products, setProducts] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [riders, setRiders] = useState<any[]>([]);
+  const [isCreatingDispatch, setIsCreatingDispatch] = useState(false);
 
   // Sample data
   const stats = {
@@ -40,13 +41,9 @@ export default function RoutesDispatch() {
 
   // sample stats remain; batches/riders/products will be fetched
 
-  const activeDispatches = [
-    { id: '#D-2024-045', rider: 'Michael Chen', route: 'Route A-12', products: ['White Bread', 'Chocolate Cake', 'Croissants', 'Muffins'] },
-    { id: '#D-2024-046', rider: 'Kevin Brown', route: 'Route B-07', products: ['White Bread', 'Croissants', 'Bagels'] },
-    { id: '#D-2024-047', rider: 'Sarah Johnson', route: 'Route C-03', products: ['Cakes', 'Pastries'] },
-  ];
+  
 
-  const [returns, setReturns] = useState<Record<string, { returned: number; damaged: number }>>({});
+  
 
   useEffect(() => {
     async function load() {
@@ -58,37 +55,30 @@ export default function RoutesDispatch() {
       if (p.success) {
         setProducts(p.data || []);
         const initAlloc: Record<string, number> = {};
-        const initReturns: Record<string, any> = {};
-        (p.data || []).forEach((prd: any) => { initAlloc[prd.id] = 0; initReturns[prd.id] = { returned: 0, damaged: 0 }; });
+        (p.data || []).forEach((prd: any) => { initAlloc[prd.id] = 0; });
         setAllocations(initAlloc);
-        setReturns(initReturns);
       }
     }
     load();
   }, []);
 
   const handleAllocationChange = (productId: string, value: string) => {
-    const available = products.find(p => p.id === productId)?.available || undefined;
     const parsed = Math.max(0, parseInt(value || '0'));
     setAllocations(prev => ({ ...prev, [productId]: parsed }));
   };
 
-  const handleReturnChange = (product: string, field: string, value: string) => {
-    setReturns(prev => ({
-      ...prev,
-      [product]: {
-        ...prev[product as keyof typeof prev],
-        [field]: Math.max(0, parseInt(value) || 0)
-      }
-    }));
-  };
+  
 
   const handleCreateDispatch = async () => {
     try {
+      setIsCreatingDispatch(true);
       const { data: user } = await supabase.auth.getUser();
       if (!user?.user?.id) throw new Error('Not authenticated');
+      if (!selectedBatch || !selectedRider) throw new Error('Select batch and rider');
+
       const payload = {
-        rider_id: selectedRider,
+        batch_id: selectedBatch || null,
+        rider_id: selectedRider || null,
         dispatch_date: new Date().toISOString().slice(0, 10),
         notes: undefined,
       } as any;
@@ -104,15 +94,16 @@ export default function RoutesDispatch() {
       alert('Dispatch created');
       // reset allocations
       setAllocations(products.reduce((acc: any, p: any) => ({ ...acc, [p.id]: 0 }), {}));
+      setSelectedBatch(''); setSelectedRider('');
     } catch (e: any) {
       console.error(e);
       alert(e?.message || 'Failed to create dispatch');
+    } finally {
+      setIsCreatingDispatch(false);
     }
   };
 
-  const handleSaveReturns = () => {
-    // TODO: persist returns to backend
-  };
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -204,7 +195,7 @@ export default function RoutesDispatch() {
                   <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600">
                     <option value="">Choose a batch...</option>
                     {batches.map((batch) => (
-                      <option key={batch.id} value={batch.id}>{batch.id} - {batch.name}</option>
+                      <option key={batch.id} value={batch.id}>{batch.batch_code || batch.batch_number || batch.id} - {batch.name}</option>
                     ))}
                   </select>
                 </div>
@@ -215,7 +206,7 @@ export default function RoutesDispatch() {
                   <select value={selectedRider} onChange={(e) => setSelectedRider(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-amber-600">
                     <option value="">Choose a rider...</option>
                     {riders.filter((r:any) => r.status === 'active' || r.status === 'Available' || !r.status).map((rider) => (
-                      <option key={rider.id} value={rider.id}>{rider.name}</option>
+                      <option key={rider.id} value={rider.id}>{rider.nickname || rider.full_name || rider.id}</option>
                     ))}
                   </select>
                 </div>
@@ -238,7 +229,7 @@ export default function RoutesDispatch() {
                 </div>
               </div>
 
-              <button onClick={handleCreateDispatch} className="flex items-center space-x-2 px-4 py-2 bg-amber-700 text-white rounded-md hover:bg-amber-800 transition-colors"><Plus className="w-4 h-4" /><span>Create Dispatch</span></button>
+              <button onClick={handleCreateDispatch} disabled={isCreatingDispatch} className="flex items-center space-x-2 px-4 py-2 bg-amber-700 text-white rounded-md hover:bg-amber-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" /><span>{isCreatingDispatch ? 'Creating…' : 'Create Dispatch'}</span></button>
             </div>
           </div>
 
@@ -285,7 +276,7 @@ export default function RoutesDispatch() {
                           <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
                             <span className="text-xs font-medium text-amber-900">{rider.avatar}</span>
                           </div>
-                          <span className="text-sm font-medium text-gray-900">{rider.name}</span>
+                          <span className="text-sm font-medium text-gray-900">{rider.nickname || rider.full_name || rider.id}</span>
                         </div>
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">

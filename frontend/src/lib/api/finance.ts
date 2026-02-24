@@ -117,8 +117,11 @@ export async function recordExpense(
       .from('expenses')
       .insert([
         {
-          ...input,
-          recorded_by: userId,
+          description: input.description,
+          amount: input.amount,
+          category: input.category,
+          expense_date: input.expense_date,
+          notes: input.notes || null,
         },
       ])
       .select()
@@ -275,8 +278,11 @@ export async function recordStockLoss(
       .from('stock_losses')
       .insert([
         {
-          ...input,
-          recorded_by: userId,
+          product_id: parseInt(input.product_id),
+          quantity_lost: input.quantity_lost,
+          reason: input.reason,
+          loss_date: input.loss_date,
+          notes: input.notes || null,
         },
       ])
       .select()

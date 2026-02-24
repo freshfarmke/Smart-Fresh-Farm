@@ -23,27 +23,29 @@ export interface AuthUser {
 
 // Products
 export interface Product {
-  id: string;
+  id: number; // bigint
   name: string;
-  unit_price: number;
-  cost_per_unit: number;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
+  weight: string | null; // e.g. "500g"
+  wholesale_price: number;
+  retail_price: number;
+  active: boolean;
+  created_at: string | null;
+  updated_at?: string | null;
 }
 
 export interface CreateProductInput {
   name: string;
-  unit_price: number;
-  cost_per_unit: number;
-  description?: string;
+  weight?: string;
+  wholesale_price: number;
+  retail_price: number;
+  active?: boolean;
 }
 
 // Production
 export interface ProductionBatch {
-  id: string;
+  id: number; // bigint
   batch_number: string;
-  created_by: string;
+  batch_code?: string;
   status: 'draft' | 'active' | 'completed' | 'closed';
   production_date: string;
   notes: string | null;
@@ -52,9 +54,9 @@ export interface ProductionBatch {
 }
 
 export interface BatchProduct {
-  id: string;
-  batch_id: string;
-  product_id: string;
+  id: number; // bigint
+  batch_id: number; // bigint
+  product_id: number; // bigint
   quantity_produced: number;
   created_at: string;
   product?: Product;
@@ -67,43 +69,46 @@ export interface CreateBatchInput {
 }
 
 export interface AddProductToBatchInput {
-  batch_id: string;
-  product_id: string;
+  batch_id: number; // bigint
+  product_id: number; // bigint
   quantity_produced: number;
 }
 
 // Raw Materials
 export interface RawMaterial {
-  id: string;
+  id: number; // bigint
   name: string;
   unit: string; // kg, liters, etc.
   unit_cost: number;
   reorder_level: number | null;
   current_stock: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RawMaterialUsage {
-  id: string;
-  material_id: string;
-  batch_id: string;
+  id: number; // bigint
+  material_id: number; // bigint
+  batch_id: number; // bigint
   quantity_used: number;
   created_at: string;
 }
 
 // Route Riders
 export interface RouteRider {
-  id: string;
-  name: string;
+  id: number; // bigint
+  full_name: string;
+  nickname?: string | null;
   phone: string;
   address: string | null;
   status: 'active' | 'inactive';
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RouteRiderFuel {
-  id: string;
-  rider_id: string;
+  id: number; // bigint
+  rider_id: number; // bigint
   amount_spent: number;
   fuel_type: string;
   date_recorded: string;
@@ -113,12 +118,13 @@ export interface RouteRiderFuel {
 
 export interface CreateRiderInput {
   name: string;
+  nickname?: string;
   phone: string;
   address?: string;
 }
 
 export interface RecordFuelInput {
-  rider_id: string;
+  rider_id: number; // bigint
   amount_spent: number;
   fuel_type: string;
   date_recorded: string;
@@ -127,61 +133,68 @@ export interface RecordFuelInput {
 
 // Route Dispatch
 export interface RouteDispatch {
-  id: string;
-  rider_id: string;
+  id: number; // bigint
+  rider_id: number; // bigint
+  batch_id?: number | null; // bigint
   dispatch_date: string;
   status: 'pending' | 'in_transit' | 'completed' | 'returned';
-  created_by: string;
   notes: string | null;
   created_at: string;
   updated_at: string;
+  rider?: {
+    nickname?: string | null;
+    full_name?: string | null;
+  };
 }
 
 export interface RouteDispatchProduct {
-  id: string;
-  dispatch_id: string;
-  product_id: string;
+  id: number; // bigint
+  dispatch_id: number; // bigint
+  product_id: number; // bigint
   quantity_dispatched: number;
+  quantity_sold?: number;
+  quantity_returned?: number;
   created_at: string;
   product?: Product;
 }
 
 export interface CreateDispatchInput {
-  rider_id: string;
+  rider_id: number; // bigint
+  batch_id?: number | null; // bigint
   dispatch_date: string;
   notes?: string;
 }
 
 export interface AddProductToDispatchInput {
-  dispatch_id: string;
-  product_id: string;
+  dispatch_id: number; // bigint
+  product_id: number; // bigint
   quantity_dispatched: number;
 }
 
 // Route Returns
 export interface RouteReturn {
-  id: string;
-  dispatch_id: string;
+  id: number; // bigint
+  dispatch_id: number; // bigint
   return_date: string;
   notes: string | null;
   created_at: string;
 }
 
 export interface RouteReturnProduct {
-  id: string;
-  return_id: string;
-  product_id: string;
+  id: number; // bigint
+  return_id: number; // bigint
+  product_id: number; // bigint
   quantity_returned: number;
-  reason: 'good' | 'expired' | 'unsold' | 'damaged';
+  reason: 'good' | 'expired' | 'unsold' | 'damaged' | 'other';
   created_at: string;
   product?: Product;
 }
 
 export interface RecordReturnInput {
-  dispatch_id: string;
+  dispatch_id: number; // bigint
   return_date: string;
   products: Array<{
-    product_id: string;
+    product_id: number; // bigint
     quantity_returned: number;
     reason: 'good' | 'expired' | 'unsold' | 'damaged';
   }>;
@@ -190,30 +203,51 @@ export interface RecordReturnInput {
 
 // Route Collections
 export interface RouteCollection {
-  id: string;
-  dispatch_id: string;
+  id: number; // bigint
+  dispatch_id: number; // bigint
   amount_collected: number;
   collection_date: string;
-  payment_method: string;
+  payment_method?: string;
   notes: string | null;
   created_at: string;
 }
 
 export interface RouteCollectionProduct {
-  id: string;
-  collection_id: string;
-  product_id: string;
+  id: number; // bigint
+  collection_id: number; // bigint
+  product_id: number; // bigint
   quantity_sold: number;
+  unit_price?: number;
   created_at: string;
 }
 
+// Production-specific product batch (production_batches table)
+export interface ProductionBatchRecord {
+  id: number; // bigint
+  product_id: number; // bigint
+  batch_code: string;
+  quantity_produced: number;
+  quantity_remaining: number;
+  expiry_date: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateProductionBatchInput {
+  product_id: number; // bigint
+  batch_code?: string;
+  quantity_produced: number;
+  quantity_remaining?: number;
+  expiry_date?: string | null;
+}
+
 export interface RecordCollectionInput {
-  dispatch_id: string;
+  dispatch_id: number; // bigint
   amount_collected: number;
   collection_date: string;
   payment_method: string;
   products: Array<{
-    product_id: string;
+    product_id: number; // bigint
     quantity_sold: number;
   }>;
   notes?: string;
@@ -221,29 +255,31 @@ export interface RecordCollectionInput {
 
 // Institutions
 export interface Institution {
-  id: string;
+  id: number; // bigint
   name: string;
   address: string | null;
   contact_person: string | null;
   phone: string | null;
   status: 'active' | 'inactive';
   created_at: string;
+  updated_at?: string;
 }
 
 export interface InstitutionOrder {
-  id: string;
-  institution_id: string;
+  id: number; // bigint
+  institution_id: number; // bigint
   order_date: string;
   status: 'pending' | 'confirmed' | 'delivered' | 'cancelled';
   total_amount: number | null;
   notes: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface InstitutionOrderProduct {
-  id: string;
-  order_id: string;
-  product_id: string;
+  id: number; // bigint
+  order_id: number; // bigint
+  product_id: number; // bigint
   quantity_ordered: number;
   unit_price: number;
   created_at: string;
@@ -257,10 +293,10 @@ export interface CreateInstitutionInput {
 }
 
 export interface CreateInstitutionOrderInput {
-  institution_id: string;
+  institution_id: number; // bigint
   order_date: string;
   products: Array<{
-    product_id: string;
+    product_id: number; // bigint
     quantity_ordered: number;
   }>;
   notes?: string;
@@ -268,14 +304,14 @@ export interface CreateInstitutionOrderInput {
 
 // Expenses
 export interface Expense {
-  id: string;
+  id: number; // bigint
   description: string;
   amount: number;
   category: string;
   expense_date: string;
-  recorded_by: string;
   notes: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RecordExpenseInput {
@@ -288,18 +324,18 @@ export interface RecordExpenseInput {
 
 // Stock Losses
 export interface StockLoss {
-  id: string;
-  product_id: string;
+  id: number; // bigint
+  product_id: number; // bigint
   quantity_lost: number;
   reason: 'expired' | 'damaged' | 'theft' | 'other';
   loss_date: string;
-  recorded_by: string;
   notes: string | null;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface RecordStockLossInput {
-  product_id: string;
+  product_id: number; // bigint
   quantity_lost: number;
   reason: 'expired' | 'damaged' | 'theft' | 'other';
   loss_date: string;

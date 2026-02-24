@@ -1,15 +1,42 @@
-'use client';
+"use client";
 
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Clock, Truck, AlertCircle } from 'lucide-react';
+import { getAllProductionBatches } from '@/lib/api/production';
 
 export function ProductionTable() {
-  const data = [
-    { id: '#B001', product: 'White Bread', qty: 200, status: 'Completed', created_at: '2026-02-20 08:30' },
-    { id: '#B002', product: 'Croissants', qty: 150, status: 'In Progress', created_at: '2026-02-20 09:15' },
-    { id: '#B003', product: 'Muffins', qty: 300, status: 'Completed', created_at: '2026-02-20 07:45' },
-    { id: '#B004', product: 'Bagels', qty: 180, status: 'Dispatched', created_at: '2026-02-20 10:00' },
-    { id: '#B005', product: 'Chocolate Cake', qty: 80, status: 'Pending', created_at: '2026-02-20 10:30' },
-  ];
+  const [batches, setBatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setLoading(true);
+      try {
+        const resp = await getAllProductionBatches();
+        if (!mounted) return;
+        if (!resp.success) {
+          setBatches([]);
+        } else {
+          // Filter to batches created today (by created_at)
+          const today = new Date().toDateString();
+          const todays = (resp.data || []).filter((b: any) => {
+            const created = b.created_at ? new Date(b.created_at).toDateString() : null;
+            return created === today;
+          });
+          setBatches(todays);
+        }
+      } catch (err) {
+        console.error('Failed to load production batches', err);
+        setBatches([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -45,33 +72,38 @@ export function ProductionTable() {
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Today's Production Overview</h3>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Batch ID</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Product</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Quantity</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Status</th>
-            <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Created At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((item) => (
-            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-              <td className="py-4 px-4 font-medium text-gray-900">{item.id}</td>
-              <td className="py-4 px-4 text-gray-700">{item.product}</td>
-              <td className="py-4 px-4 text-gray-700 font-medium">{item.qty} units</td>
-              <td className="py-4 px-4">
-                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                  {getStatusIcon(item.status)}
-                  {item.status}
-                </span>
-              </td>
-              <td className="py-4 px-4 text-gray-600 text-xs">{item.created_at}</td>
+      {loading ? (
+        <div className="text-gray-600">Loading...</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Batch Code</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Product</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Produced</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Remaining</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 text-xs uppercase tracking-wide">Created At</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {batches.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-gray-500">No production batches created today</td>
+              </tr>
+            ) : (
+              batches.map((b) => (
+                <tr key={b.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                  <td className="py-4 px-4 font-medium text-gray-900">{b.batch_code}</td>
+                  <td className="py-4 px-4 text-gray-700">{b.product?.name ?? b.product_id}</td>
+                  <td className="py-4 px-4 text-gray-700 font-medium">{b.quantity_produced}</td>
+                  <td className="py-4 px-4 text-gray-700 font-medium">{b.quantity_remaining}</td>
+                  <td className="py-4 px-4 text-gray-600 text-xs">{b.created_at ? new Date(b.created_at).toLocaleTimeString() : '-'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -9,14 +9,14 @@ export default function NewBatchPage() {
   const router = useRouter();
   const [batchNumber, setBatchNumber] = useState('');
   const [batchDate, setBatchDate] = useState(new Date().toISOString().split('T')[0]);
-  const [products, setProducts] = useState([]);
-  const [availableProducts, setAvailableProducts] = useState([]);
+  const [products, setProducts] = useState<{ id: string; name: string; quantity: number }[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<{ id: string; name: string }[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -74,11 +74,11 @@ export default function NewBatchPage() {
     setError(null);
   };
 
-  const handleRemoveProduct = (productId) => {
+  const handleRemoveProduct = (productId: string) => {
     setProducts(products.filter(p => p.id !== productId));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
@@ -89,52 +89,45 @@ export default function NewBatchPage() {
         return;
       }
 
-      const { data: user } = await supabase.auth.getUser();
-      if (!user?.user?.id) {
-        setError('You must be logged in to create a batch');
-        return;
-      }
-
-      const totalUnits = products.reduce((sum, p) => sum + p.quantity, 0);
-
-      // Create batch
+      // Step 1: Create the production batch
       const { data: batchData, error: batchError } = await supabase
-        .from('batches')
-        .insert({
-          batch_number: batchNumber,
-          batch_date: batchDate,
-          status: 'pending',
-          total_quantity: products.length,
-          total_units: totalUnits,
-          notes,
-          created_by: user.user.id
-        })
+        .from('production_batches')
+        .insert([
+          {
+            batch_number: batchNumber,
+            batch_code: batchNumber,
+            status: 'draft',
+            production_date: batchDate,
+            notes: notes || null,
+          },
+        ])
         .select()
         .single();
 
       if (batchError) throw batchError;
+      if (!batchData?.id) throw new Error('Failed to create batch');
 
-      // Add products to batch
+      // Step 2: Add products to the batch
+      // product_id is a UUID (string) in the DB — do not parseInt
       const batchProducts = products.map(p => ({
         batch_id: batchData.id,
         product_id: p.id,
-        quantity_planned: p.quantity,
-        quantity_produced: 0,
-        quantity_dispatched: 0,
-        quantity_returned: 0
+        quantity_produced: p.quantity,
       }));
 
-      const { error: productsError } = await supabase
+      const { data: productsData, error: productsError } = await supabase
         .from('batch_products')
-        .insert(batchProducts);
+        .insert(batchProducts)
+        .select();
 
       if (productsError) throw productsError;
 
-      // Redirect to batch details
-      router.push(`/production/${batchData.id}`);
+      // Redirect to production batches list
+      router.push(`/production/production_batches`);
     } catch (err) {
       console.error('Error creating batch:', err);
-      setError(err.message || 'Failed to create batch');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create batch';
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -209,7 +202,7 @@ export default function NewBatchPage() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Any special instructions or notes about this batch..."
-                rows="3"
+                rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>

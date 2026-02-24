@@ -1,8 +1,75 @@
 "use client";
 
 import { MoreHorizontal, Edit2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase/client';
 
 export default function CollectionsPage() {
+  const [sourceType, setSourceType] = useState<'rider'|'institution'>('rider');
+  const [riders, setRiders] = useState<any[]>([]);
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [selectedSource, setSelectedSource] = useState('');
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [amountCollected, setAmountCollected] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [collectionDate, setCollectionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [recentCollections, setRecentCollections] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchLookups();
+    fetchCollections();
+  }, []);
+
+  async function fetchLookups() {
+    try {
+      const { data: ridersData } = await supabase.from('route_riders').select('*').limit(200).order('full_name');
+      setRiders(ridersData || []);
+    } catch (err) {
+      console.error('Failed to load riders', err);
+    }
+    try {
+      const { data: batchesData } = await supabase.from('production_batches').select('*').limit(200).order('production_date', { ascending: false });
+      setBatches(batchesData || []);
+    } catch (err) {
+      console.error('Failed to load batches', err);
+    }
+    try {
+      const { data: inst } = await supabase.from('institutions').select('*').limit(200).order('name');
+      setInstitutions(inst || []);
+    } catch (err) {
+      // institutions table may not exist yet
+    }
+  }
+
+  async function fetchCollections() {
+    try {
+      const { data } = await supabase.from('route_collections').select('*, dispatch:route_dispatch(id, rider_id)');
+      setRecentCollections(data || []);
+    } catch (err) {
+      console.error('Failed to fetch collections', err);
+    }
+  }
+
+  async function handleRecordCollection() {
+    try {
+      const payload: any = {
+        dispatch_id: selectedBatch || null,
+        amount_collected: parseFloat(amountCollected || '0'),
+        collection_date: collectionDate,
+        payment_method: paymentMethod || null,
+        notes: null,
+      };
+      const { error } = await supabase.from('route_collections').insert([payload]);
+      if (error) throw error;
+      // refresh
+      setAmountCollected(''); setSelectedBatch(''); setSelectedSource('');
+      fetchCollections();
+    } catch (err) {
+      console.error('Failed to record collection', err);
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-100">
 
@@ -16,23 +83,45 @@ export default function CollectionsPage() {
           <p className="text-gray-500 text-sm">Record revenue from route riders and institutions</p>
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards (basic totals from recent collections) */}
         <div className="grid grid-cols-4 gap-6">
-          <SummaryCard title="Today's Collections" amount="KSh 17,800" />
-          <SummaryCard title="Pending Collections" amount="KSh 12,500" />
-          <SummaryCard title="Route Collections" amount="KSh 9,500" />
-          <SummaryCard title="Institution Collections" amount="KSh 21,250" />
+          <SummaryCard title={`Today's Collections`} amount={`KSh ${recentCollections.reduce((s,c)=> s + Number(c.amount_collected||0),0)}`} />
+          <SummaryCard title="Pending Collections" amount="KSh 0" />
+          <SummaryCard title="Route Collections" amount={`KSh ${recentCollections.reduce((s,c)=> s + Number(c.amount_collected||0),0)}`} />
+          <SummaryCard title="Institution Collections" amount="KSh 0" />
         </div>
 
         {/* Content Section */}
         <div className="grid grid-cols-3 gap-8">
 
           {/* New Collection Form */}
-          <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm space-y-6">
+            <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm space-y-6">
             <h3 className="text-lg font-semibold text-gray-700">New Collection</h3>
 
-            <FormSelect label="Source Type" />
-            <FormSelect label="Batch/Order" />
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Source Type</label>
+              <select value={sourceType} onChange={e=> setSourceType(e.target.value as any)} className="w-full border rounded-xl px-4 py-2 text-sm">
+                <option value="rider">Route Rider</option>
+                <option value="institution">Institution</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Source</label>
+              <select value={selectedSource} onChange={e=> setSelectedSource(e.target.value)} className="w-full border rounded-xl px-4 py-2 text-sm">
+                <option value="">Select source</option>
+                {sourceType === 'rider' && riders.map(r=> <option key={r.id} value={r.id}>{r.full_name}</option>)}
+                {sourceType === 'institution' && institutions.map(i=> <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Batch/Order</label>
+              <select value={selectedBatch} onChange={e=> setSelectedBatch(e.target.value)} className="w-full border rounded-xl px-4 py-2 text-sm">
+                <option value="">Select batch/order</option>
+                {batches.map(b=> <option key={b.id} value={b.id}>{b.batch_code || b.batch_number}</option>)}
+              </select>
+            </div>
 
             <div>
               <h4 className="text-sm font-medium text-gray-600 mb-2">Products Sold</h4>
@@ -45,11 +134,27 @@ export default function CollectionsPage() {
               </div>
             </div>
 
-            <FormInput label="Amount Collected" placeholder="5300" />
-            <FormSelect label="Payment Method" />
-            <FormInput label="Collection Date" placeholder="mm/dd/yyyy" />
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Amount Collected</label>
+              <input value={amountCollected} onChange={e=> setAmountCollected(e.target.value)} className="w-full border rounded-xl px-4 py-2 text-sm" />
+            </div>
 
-            <button className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-xl font-medium transition">
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Payment Method</label>
+              <select value={paymentMethod} onChange={e=> setPaymentMethod(e.target.value)} className="w-full border rounded-xl px-4 py-2 text-sm">
+                <option value="">Select method</option>
+                <option value="mpesa">M-Pesa</option>
+                <option value="cash">Cash</option>
+                <option value="bank">Bank Transfer</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Collection Date</label>
+              <input value={collectionDate} onChange={e=> setCollectionDate(e.target.value)} type="date" className="w-full border rounded-xl px-4 py-2 text-sm" />
+            </div>
+
+            <button onClick={handleRecordCollection} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-xl font-medium transition">
               Record Collection
             </button>
           </div>
@@ -83,12 +188,11 @@ export default function CollectionsPage() {
                 </tr>
               </thead>
 
-              <tbody className="divide-y">
-                <TableRow date="2024-02-19" source="John Doe" batch="BATCH-001" amount="KSh 5,300" method="M-Pesa" status="Confirmed" />
-                <TableRow date="2024-02-19" source="St. Mary’s School" batch="ORDER-456" amount="KSh 12,500" method="Bank Transfer" status="Pending" />
-                <TableRow date="2024-02-18" source="Jane Smith" batch="BATCH-002" amount="KSh 4,200" method="Cash" status="Confirmed" />
-                <TableRow date="2024-02-18" source="City Hospital" batch="ORDER-789" amount="KSh 8,750" method="Card" status="Confirmed" />
-              </tbody>
+                <tbody className="divide-y">
+                  {recentCollections.map(c => (
+                    <TableRow key={c.id} date={c.collection_date || c.created_at?.split('T')?.[0]} source={c.source || (c.dispatch ? c.dispatch.rider_id : '')} batch={c.dispatch_id || ''} amount={`KSh ${c.amount_collected}`} method={c.payment_method || ''} status="Confirmed" />
+                  ))}
+                </tbody>
             </table>
           </div>
         </div>

@@ -77,7 +77,13 @@ export async function createProduct(
   try {
     const { data, error } = await supabase
       .from('products')
-      .insert([product])
+      .insert([{
+        name: product.name,
+        weight: product.weight ?? null,
+        wholesale_price: product.wholesale_price,
+        retail_price: product.retail_price,
+        active: product.active ?? true,
+      }])
       .select()
       .single();
 

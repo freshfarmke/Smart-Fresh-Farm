@@ -11,6 +11,7 @@ export function FinanceSidebar({ currentPath }: { currentPath?: string }) {
   const navItems = [
     { name: 'Overview', href: '/finance', icon: LayoutDashboard },
     { name: 'Expenses', href: '/finance/expenses', icon: TrendingUp },
+    { name: 'Products', href: '/finance/products', icon: Store },
     { name: 'Route Dispatch', href: '/finance/route-dispatch', icon: Truck },
     { name: 'Collections', href: '/finance/collections', icon: DollarSign },
     { name: 'Stock Loss', href: '/finance/stock-loss', icon: Boxes },

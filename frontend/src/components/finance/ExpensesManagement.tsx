@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
 import {
   TrendingDown,
@@ -39,6 +40,17 @@ const ExpensesManagement: React.FC = () => {
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [selectedCategory, setSelectedCategory] = useState('all');
 
+    // Live data
+    const [expenses, setExpenses] = useState<any[]>([]);
+    const [stats, setStats] = useState({ totalExpenses: 0, monthlyAverage: 0, largestExpense: 0, categories: 0 });
+
+    // Add expense form state
+    const [formDate, setFormDate] = useState('');
+    const [formCategory, setFormCategory] = useState('');
+    const [formAmount, setFormAmount] = useState('');
+    const [formRecordedBy, setFormRecordedBy] = useState('');
+    const [formNotes, setFormNotes] = useState('');
+
     const categories = [
       'All Categories',
       'Salary',
@@ -51,15 +63,32 @@ const ExpensesManagement: React.FC = () => {
       'Marketing',
     ];
 
-    const expenses = [
-      { id: 1, date: '2024-02-19', category: 'Salary', amount: 3500.0, recordedBy: 'Brian Koech', notes: 'Monthly salary for head baker', avatar: 'BK' },
-      { id: 2, date: '2024-02-18', category: 'Fuel', amount: 245.8, recordedBy: 'Brian Koech', notes: 'Delivery truck fuel for route 3', avatar: 'BK' },
-      { id: 3, date: '2024-02-17', category: 'Rent', amount: 2800.0, recordedBy: 'Ezek Kiptoo', notes: 'Monthly bakery facility rent', avatar: 'EK' },
-      { id: 4, date: '2024-02-16', category: 'Utilities', amount: 485.3, recordedBy: 'Ezek Kiptoo', notes: 'Electricity and water bill', avatar: 'EK' },
-      { id: 5, date: '2024-02-15', category: 'Miscellaneous', amount: 125.5, recordedBy: 'Tom Baker', notes: 'Office supplies and cleaning materials', avatar: 'TB' },
-    ];
+    useEffect(() => {
+      fetchExpenses();
+    }, []);
 
-    const stats = { totalExpenses: 8456.6, monthlyAverage: 2818.87, largestExpense: 3500.0, categories: 7 };
+    async function fetchExpenses() {
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .order('expense_date', { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+        const rows = data || [];
+        setExpenses(rows);
+
+        // Simple stats
+        const total = rows.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+        const largest = rows.reduce((m: number, r: any) => Math.max(m, Number(r.amount || 0)), 0);
+        const categoriesCount = Array.from(new Set(rows.map((r: any) => r.category))).length;
+        const monthlyAvg = rows.length ? total / Math.max(1, new Date().getMonth() + 1) : 0;
+        setStats({ totalExpenses: total, monthlyAverage: monthlyAvg, largestExpense: largest, categories: categoriesCount });
+      } catch (err) {
+        console.error('Failed to fetch expenses', err);
+      }
+    }
 
     const getCategoryIcon = (category: string) => {
       switch (category) {
@@ -106,14 +135,42 @@ const ExpensesManagement: React.FC = () => {
     };
 
     const handleApplyFilters = () => {
-      // TODO: apply filters (implement API call)
+      // For now refetch (could send params)
+      fetchExpenses();
     };
 
-    const handleEdit = (id: number) => {
-      // TODO: edit expense
+    const handleEdit = (id: string) => {
+      // TODO: edit expense (open modal)
     };
-    const handleDelete = (id: number) => {
-      // TODO: delete expense
+    const handleDelete = async (id: string) => {
+      try {
+        const { error } = await supabase.from('expenses').delete().eq('id', id);
+        if (error) throw error;
+        fetchExpenses();
+      } catch (err) {
+        console.error('Failed to delete expense', err);
+      }
+    };
+
+    const handleSaveExpense = async () => {
+      try {
+        const payload = {
+          description: formNotes || `${formCategory} expense`,
+          amount: parseFloat(formAmount || '0'),
+          category: formCategory,
+          expense_date: formDate || new Date().toISOString().split('T')[0],
+          notes: formNotes || null,
+        };
+        const { data, error } = await supabase.from('expenses').insert([payload]).select().single();
+        if (error) throw error;
+        // clear form
+        setFormAmount(''); setFormCategory(''); setFormDate(''); setFormNotes(''); setFormRecordedBy('');
+        setShowAddExpense(false);
+        fetchExpenses();
+      } catch (err) {
+        console.error('Failed to save expense', err);
+        setError('Failed to save expense');
+      }
     };
 
     return (
@@ -185,10 +242,13 @@ const ExpensesManagement: React.FC = () => {
                     </select>
                   </div>
                   <div className="flex items-end">
-                    <button onClick={handleApplyFilters} className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2">
-                      <Filter className="w-4 h-4" />
-                      <span>Apply Filters</span>
-                    </button>
+                    <div className="flex space-x-2 w-full">
+                      <button onClick={handleApplyFilters} className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2">
+                        <Filter className="w-4 h-4" />
+                        <span>Apply Filters</span>
+                      </button>
+                      <button onClick={() => setShowAddExpense(true)} className="px-4 py-2 border rounded-md text-primary-700 hover:bg-primary-50">Add Expense</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -205,14 +265,14 @@ const ExpensesManagement: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                      <input type="date" className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      <input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                      <select className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <select value={formCategory} onChange={e => setFormCategory(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500">
                         <option value="">Select category</option>
                         {categories.slice(1).map((category) => (
-                          <option key={category} value={category.toLowerCase()}>{category}</option>
+                          <option key={category} value={category}>{category}</option>
                         ))}
                       </select>
                     </div>
@@ -220,21 +280,21 @@ const ExpensesManagement: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                        <input type="number" step="0.01" className="w-full pl-8 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="0.00" />
+                        <input type="number" step="0.01" value={formAmount} onChange={e => setFormAmount(e.target.value)} className="w-full pl-8 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="0.00" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Recorded By</label>
-                      <input type="text" className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Your name" />
+                      <input type="text" value={formRecordedBy} onChange={e => setFormRecordedBy(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Your name" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                      <textarea rows={3} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Enter expense details..."></textarea>
+                      <textarea rows={3} value={formNotes} onChange={e => setFormNotes(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Enter expense details..."></textarea>
                     </div>
                   </div>
                   <div className="flex justify-end space-x-3 mt-4">
                     <button onClick={() => setShowAddExpense(false)} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button onClick={() => setShowAddExpense(false)} className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save Expense</button>
+                    <button onClick={handleSaveExpense} className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save Expense</button>
                   </div>
                 </div>
               </div>
@@ -262,13 +322,13 @@ const ExpensesManagement: React.FC = () => {
                       return (
                         <tr key={expense.id} className="hover:bg-gray-50">
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2"><Calendar className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-900">{expense.date}</span></div>
+                            <div className="flex items-center space-x-2"><Calendar className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-900">{expense.expense_date}</span></div>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex items-center space-x-2"><span className={clsx('p-1 rounded', getCategoryColor(expense.category))}><CategoryIcon className="w-4 h-4" /></span><span className="text-sm font-medium text-gray-900">{expense.category}</span></div>
                           </td>
-                          <td className="px-5 py-4 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">{formatCurrency(expense.amount)}</span></td>
-                          <td className="px-5 py-4 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">{expense.avatar}</span></div><span className="text-sm text-gray-600">{expense.recordedBy}</span></div></td>
+                          <td className="px-5 py-4 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">{formatCurrency(Number(expense.amount) || 0)}</span></td>
+                          <td className="px-5 py-4 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">EB</span></div><span className="text-sm text-gray-600">{expense.recorded_by || ''}</span></div></td>
                           <td className="px-5 py-4"><p className="text-sm text-gray-600 truncate max-w-xs">{expense.notes}</p></td>
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex items-center space-x-2">

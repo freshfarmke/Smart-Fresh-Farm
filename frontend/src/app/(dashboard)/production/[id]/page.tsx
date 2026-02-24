@@ -102,27 +102,27 @@ export default function BatchDetailsPage() {
   };
 
   const getStatusColor = (status: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       pending: 'bg-gray-100 text-gray-700',
       in_progress: 'bg-blue-100 text-blue-700',
       completed: 'bg-green-100 text-green-700',
       dispatched: 'bg-purple-100 text-purple-700'
     };
-    return colors[status] || colors.pending;
+    return colors[status] ?? colors.pending;
   };
 
   const getStatusLabel = (status: string) => {
-    const labels = {
+    const labels: Record<string, string> = {
       pending: 'Pending',
       in_progress: 'In Progress',
       completed: 'Completed',
       dispatched: 'Dispatched'
     };
-    return labels[status] || status;
+    return labels[status] ?? status;
   };
 
-  const getNextStatus = (currentStatus) => {
-    const flow = {
+  const getNextStatus = (currentStatus: string) => {
+    const flow: Record<string, string | undefined> = {
       pending: 'in_progress',
       in_progress: 'completed',
       completed: 'dispatched'
@@ -187,7 +187,8 @@ export default function BatchDetailsPage() {
               {batch.status !== 'dispatched' && (
                 <button
                   onClick={() => {
-                    setSelectedStatus(getNextStatus(batch.status));
+                    const next = getNextStatus(batch.status) ?? '';
+                    setSelectedStatus(next);
                     setShowStatusModal(true);
                   }}
                   className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"

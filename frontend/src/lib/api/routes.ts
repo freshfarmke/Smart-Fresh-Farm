@@ -37,7 +37,7 @@ export async function getAllRouteRiders(): Promise<ApiResponse<RouteRider[]>> {
     const { data, error } = await supabase
       .from('route_riders')
       .select('*')
-      .order('name');
+      .order('full_name');
 
     if (error) throw error;
 
@@ -63,9 +63,17 @@ export async function createRouteRider(
   input: CreateRiderInput
 ): Promise<ApiResponse<RouteRider>> {
   try {
+    // Map frontend `name` -> DB `full_name` to avoid inserting unknown `name` column
+    const insertBody: any = {
+      full_name: (input as any).name || null,
+      phone: (input as any).phone || null,
+      nickname: (input as any).nickname || null,
+      status: (input as any).status || 'active',
+    };
+
     const { data, error } = await supabase
       .from('route_riders')
-      .insert([{ ...input, status: 'active' }])
+      .insert([insertBody])
       .select()
       .single();
 
@@ -80,7 +88,7 @@ export async function createRouteRider(
       success: false,
       error: {
         message: 'Failed to create route rider',
-        details: error instanceof Error ? { error: error.message } : undefined,
+        details: (error as any) || undefined,
       },
     };
   }
@@ -155,7 +163,7 @@ export async function getAllDispatches(): Promise<ApiResponse<RouteDispatch[]>> 
   try {
     const { data, error } = await supabase
       .from('route_dispatch')
-      .select('*')
+      .select('*, rider:route_riders(nickname, full_name)')
       .order('dispatch_date', { ascending: false });
 
     if (error) throw error;
@@ -227,8 +235,10 @@ export async function createDispatch(
       .from('route_dispatch')
       .insert([
         {
-          ...input,
-          created_by: userId,
+          rider_id: input.rider_id,
+          batch_id: input.batch_id,
+          dispatch_date: input.dispatch_date,
+          notes: input.notes,
           status: 'pending',
         },
       ])
