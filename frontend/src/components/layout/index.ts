@@ -4,6 +4,5 @@
  */
 
 export { Header } from './Header';
-export { Sidebar } from './Sidebar';
 export { FinanceSidebar } from './FinanceSidebar';
 export { ProductionSidebar } from './ProductionSidebar';

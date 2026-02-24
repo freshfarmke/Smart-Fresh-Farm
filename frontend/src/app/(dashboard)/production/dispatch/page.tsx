@@ -8,7 +8,8 @@ import {
   Clock,
   Plus,
   Filter,
-  ArrowLeft
+  ArrowLeft,
+  Search
 } from 'lucide-react';
 import { getAllBatches } from '@/lib/api/production';
 import { getAllRouteRiders, createDispatch, addProductToDispatch } from '@/lib/api/routes';

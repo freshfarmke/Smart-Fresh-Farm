@@ -71,10 +71,10 @@ export default function BatchDetailsPage() {
     }
   };
 
-  const handleStatusChange = async (newStatus) => {
+  const handleStatusChange = async (newStatus: string) => {
     setUpdatingStatus(true);
     try {
-      const updateData = {
+      const updateData: any = {
         status: newStatus
       };
 
@@ -101,7 +101,7 @@ export default function BatchDetailsPage() {
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     const colors = {
       pending: 'bg-gray-100 text-gray-700',
       in_progress: 'bg-blue-100 text-blue-700',
@@ -111,7 +111,7 @@ export default function BatchDetailsPage() {
     return colors[status] || colors.pending;
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     const labels = {
       pending: 'Pending',
       in_progress: 'In Progress',
