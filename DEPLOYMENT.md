@@ -12,6 +12,40 @@ This document describes steps to deploy the frontend to Vercel and options for t
   - (If using Supabase server-side helpers) any server keys in the backend or Vercel environment (do NOT expose server keys as NEXT_PUBLIC_*)
 
 - Recommended Vercel settings:
+## Fixing Windows EPERM / locked native module (quick)
+If `npm ci` fails on Windows with an EPERM error referencing `next-swc.win32-x64-msvc.node`, do the following:
+
+- Close editors and stop Node/CLI processes that might hold the file (close VS Code and terminals).
+- Temporarily disable antivirus or add the project folder to exclusions.
+- From the `frontend` folder run the cleanup script we added:
+
+```powershell
+cd frontend
+npm run cleanup
+```
+
+If the script exits with errors because the file is locked, run PowerShell as Administrator and run these commands:
+
+```powershell
+# stop Node processes
+Get-Process node | Stop-Process -Force
+# remove node_modules folder
+Remove-Item -Recurse -Force .\node_modules
+# remove package-lock
+Remove-Item -Force .\package-lock.json
+# clear npm cache
+npm cache clean --force
+# reinstall
+npm ci
+```
+
+After `npm ci` completes, run:
+
+```powershell
+npm run build
+```
+
+If Vercel reports "No Next.js version detected" make sure `vercel.json` has `rootDirectory: "frontend"` and re-deploy. Ensure environment variables are set in the Vercel project settings rather than committed to source.
   - Framework Preset: `Next.js` (Vercel auto-detects this)
   - Build Command: leave blank (Vercel will run `npm install && npm run build` in the detected root). If you prefer explicit: `cd frontend && npm ci && npm run build`.
   - Output directory: leave empty for Next.js (Vercel handles it).
