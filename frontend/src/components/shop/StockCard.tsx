@@ -1,7 +1,5 @@
 'use client';
 
-import { Package, Clock, RefreshCw } from 'lucide-react';
-
 interface StockCardProps {
   title: string;
   quantity: number;

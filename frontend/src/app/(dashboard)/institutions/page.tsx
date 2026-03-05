@@ -23,8 +23,8 @@ interface Institution {
   name: string;
   contact_person?: string | null;
   contactPerson?: string;
-  phone?: string;
-  address?: string;
+  phone: string | null;
+  address: string | null;
   orders?: number;
   balance?: number;
   balanceStatus?: 'positive' | 'overdue';
@@ -104,7 +104,7 @@ const InstitutionsManagement = () => {
       try {
         const payload = {
           name: newInstitution.name,
-          contact_person: newInstitution.contactPerson || newInstitution.contact_person || null,
+          contact_person: newInstitution.contactPerson || null,
           phone: newInstitution.phone || null,
           address: newInstitution.address || null,
         };

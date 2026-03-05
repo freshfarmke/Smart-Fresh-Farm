@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, Truck, AlertCircle } from 'lucide-react';
 import { getAllProductionBatches } from '@/lib/api/production';
 
 export function ProductionTable() {
@@ -38,35 +37,6 @@ export function ProductionTable() {
     return () => { mounted = false; };
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Completed':
-        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
-      case 'In Progress':
-        return <Clock className="w-4 h-4 text-amber-600" />;
-      case 'Dispatched':
-        return <Truck className="w-4 h-4 text-blue-600" />;
-      case 'Pending':
-        return <AlertCircle className="w-4 h-4 text-gray-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Completed':
-        return 'bg-green-100 text-green-800';
-      case 'In Progress':
-        return 'bg-amber-100 text-amber-800';
-      case 'Dispatched':
-        return 'bg-blue-100 text-blue-800';
-      case 'Pending':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import useSWR from 'swr';
+import toast from 'react-hot-toast';
 import {
   Package,
   AlertTriangle,
@@ -23,6 +25,8 @@ import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { FinanceSidebar } from '@/components/layout';
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 const StockLossManagement: React.FC = () => {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,23 +38,10 @@ const StockLossManagement: React.FC = () => {
   const [quantity, setQuantity] = useState('');
   const [lossReason, setLossReason] = useState('');
   const [lossDate, setLossDate] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const stats = [
-    { id: 'expired', label: 'Expired', value: 348, icon: Clock, color: 'amber', trend: '+12%', trendUp: false },
-    { id: 'damaged', label: 'Damaged', value: 127, icon: AlertTriangle, color: 'rose', trend: '-5%', trendUp: true },
-    { id: 'unsold', label: 'Unsold', value: 256, icon: Archive, color: 'blue', trend: '+8%', trendUp: false },
-    { id: 'total', label: 'Total Loss', value: 731, icon: Package, color: 'primary', trend: '+3%', trendUp: false },
-  ];
-
-  const lossRecords = [
-    { id: 1, date: '2024-01-15', batchId: 'BTH-2024-001', product: 'White Bread', quantity: 45, reason: 'Expired', reasonType: 'expired', recordedBy: 'John Baker', time: '09:30 AM' },
-    { id: 2, date: '2024-01-15', batchId: 'BTH-2024-002', product: 'Croissant', quantity: 23, reason: 'Damaged', reasonType: 'damaged', recordedBy: 'Sarah Smith', time: '10:15 AM' },
-    { id: 3, date: '2024-01-14', batchId: 'BTH-2024-003', product: 'Baguette', quantity: 67, reason: 'Unsold', reasonType: 'unsold', recordedBy: 'Mike Wilson', time: '02:30 PM' },
-    { id: 4, date: '2024-01-14', batchId: 'BTH-2024-001', product: 'Wheat Bread', quantity: 89, reason: 'Expired', reasonType: 'expired', recordedBy: 'John Baker', time: '11:45 AM' },
-    { id: 5, date: '2024-01-13', batchId: 'BTH-2024-004', product: 'Muffin', quantity: 34, reason: 'Damaged', reasonType: 'damaged', recordedBy: 'Ezek Kiptoo', time: '03:20 PM' },
-    { id: 6, date: '2024-01-13', batchId: 'BTH-2024-002', product: 'White Bread', quantity: 52, reason: 'Unsold', reasonType: 'unsold', recordedBy: 'Sarah Smith', time: '04:00 PM' },
-  ];
-
+  // reasons still static for now, but could also live in a DB table
   const lossReasons = [
     { value: 'all', label: 'All Reasons' },
     { value: 'expired', label: 'Expired' },
@@ -60,14 +51,31 @@ const StockLossManagement: React.FC = () => {
     { value: 'production', label: 'Production Error' },
   ];
 
-  const batches = [
-    { id: 'BTH-2024-001', name: 'Morning Batch' },
-    { id: 'BTH-2024-002', name: 'Afternoon Batch' },
-    { id: 'BTH-2024-003', name: 'Evening Batch' },
-    { id: 'BTH-2024-004', name: 'Special Order' },
-  ];
+  // data fetched from API
+  const { data: lossesData, mutate: mutateLosses } = useSWR('/api/finance/stock-loss?pageSize=100', fetcher);
+  const losses: any[] = lossesData?.data || [];
 
-  const products = ['White Bread', 'Wheat Bread', 'Croissant', 'Baguette', 'Muffin', 'Queen Cake', 'Buns', 'Brown Bread', 'Chocolate Cake'];
+  const { data: productsData } = useSWR('/api/products', fetcher);
+  const products = productsData?.data || [];
+
+  const { data: batchesData } = useSWR('/api/production/batches', fetcher);
+  const batches = batchesData?.data || [];
+
+  // derive stats from losses
+  const stats = React.useMemo(() => {
+    const counts: any = { expired: 0, damaged: 0, unsold: 0, total: 0 };
+    losses.forEach((r: any) => {
+      const t = r.reason?.toLowerCase();
+      if (t && counts[t] !== undefined) counts[t] += Number(r.quantity || 0);
+      counts.total += Number(r.quantity || 0);
+    });
+    return [
+      { id: 'expired', label: 'Expired', value: counts.expired, icon: Clock, color: 'amber', trend: '', trendUp: false },
+      { id: 'damaged', label: 'Damaged', value: counts.damaged, icon: AlertTriangle, color: 'rose', trend: '', trendUp: false },
+      { id: 'unsold', label: 'Unsold', value: counts.unsold, icon: Archive, color: 'blue', trend: '', trendUp: false },
+      { id: 'total', label: 'Total Loss', value: counts.total, icon: Package, color: 'primary', trend: '', trendUp: false },
+    ];
+  }, [losses]);
 
   const getReasonDetails = (reason: string) => {
     switch (reason) {
@@ -100,17 +108,172 @@ const StockLossManagement: React.FC = () => {
   const formatNumber = (num: number) => num.toLocaleString();
 
   const handleRecordLoss = () => {
-    // TODO: persist loss record
-    setShowRecordForm(false);
-    setSelectedBatch('');
-    setSelectedProduct('');
-    setQuantity('');
-    setLossReason('');
-    setLossDate('');
+    setFormError('');
+    
+    // Validation
+    if (!selectedBatch) {
+      setFormError('Please select a batch');
+      return;
+    }
+    if (!selectedProduct) {
+      setFormError('Please select a product');
+      return;
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      setFormError('Quantity must be greater than 0');
+      return;
+    }
+    if (!lossReason) {
+      setFormError('Please select a reason');
+      return;
+    }
+    if (!lossDate) {
+      setFormError('Please select a loss date');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    fetch('/api/finance/stock-loss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        batch_id: selectedBatch,
+        product_id: selectedProduct,
+        quantity: Number(quantity),
+        reason: lossReason,
+        loss_date: lossDate,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          mutateLosses();
+          setShowRecordForm(false);
+          setSelectedBatch('');
+          setSelectedProduct('');
+          setQuantity('');
+          setLossReason('');
+          setLossDate('');
+          setFormError('');
+          toast.success('Loss record created successfully', {
+            duration: 4000,
+            position: 'bottom-right',
+            style: {
+              background: '#10b981',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          });
+        } else {
+          const errMsg = data.error?.message || 'Failed to create loss record';  
+          setFormError(errMsg);
+          toast.error(errMsg, {
+            duration: 4000,
+            position: 'bottom-right',
+            style: {
+              background: '#ef4444',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          });
+        }
+      })
+      .catch(err => {
+        const errMsg = 'Error creating loss record: ' + err.message;
+        setFormError(errMsg);
+        toast.error(errMsg, {
+          duration: 4000,
+          position: 'bottom-right',
+          style: {
+            background: '#ef4444',
+            color: '#fff',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+        });
+      })
+      .finally(() => setIsSubmitting(false));
   };
 
-  const handleDelete = (_id: number) => {
-    // TODO: delete record (implement API call)
+  const handleDelete = (_id: string) => {
+    toast(
+      (t) => (
+        <div className="flex items-center space-x-3">
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900">Delete Record?</p>
+            <p className="text-sm text-gray-600 mt-1">This action cannot be undone.</p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="px-3 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                fetch(`/api/finance/stock-loss?id=${_id}`, {
+                  method: 'DELETE',
+                })
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success) {
+                      mutateLosses();
+                      toast.success('Record deleted successfully', {
+                        duration: 3000,
+                        style: {
+                          background: '#10b981',
+                          color: '#fff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                        },
+                      });
+                    } else {
+                      toast.error(data.error?.message || 'Failed to delete record', {
+                        duration: 3000,
+                        style: {
+                          background: '#ef4444',
+                          color: '#fff',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                        },
+                      });
+                    }
+                  })
+                  .catch(err => {
+                    toast.error('Error deleting record: ' + err.message, {
+                      duration: 3000,
+                      style: {
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                      },
+                    });
+                  });
+              }}
+              className="px-3 py-1 text-white bg-rose-600 rounded hover:bg-rose-700 transition-colors text-sm font-medium"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: Infinity,
+        style: {
+          background: '#fff',
+          color: '#000',
+          padding: '16px',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+        },
+      }
+    );
   };
 
   return (
@@ -187,13 +350,18 @@ const StockLossManagement: React.FC = () => {
 
             {showRecordForm && (
               <div className="p-4 bg-white">
+                {formError && (
+                  <div className="mb-4 px-4 py-2 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+                    {formError}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 flex items-center space-x-2"><Package className="w-4 h-4 text-gray-400" /><span>Batch ID</span></label>
                     <div className="relative">
                       <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 appearance-none">
                         <option value="">Select Batch</option>
-                        {batches.map((batch) => (<option key={batch.id} value={batch.id}>{batch.id} - {batch.name}</option>))}
+                        {batches.map((batch: any) => (<option key={batch.id} value={batch.id}>{batch.id} - {batch.name}</option>))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     </div>
@@ -204,7 +372,7 @@ const StockLossManagement: React.FC = () => {
                     <div className="relative">
                       <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 appearance-none">
                         <option value="">Select Product</option>
-                        {products.map((product, index) => (<option key={index} value={product}>{product}</option>))}
+                        {products.map((product: any) => (<option key={product.id} value={product.id}>{product.name}</option>))}
                       </select>
                       <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     </div>
@@ -232,7 +400,7 @@ const StockLossManagement: React.FC = () => {
                   </div>
 
                   <div className="flex items-end">
-                    <button onClick={handleRecordLoss} className="w-full px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all duration-200 font-medium shadow-sm flex items-center justify-center space-x-2"><Plus className="w-4 h-4" /><span>Record Loss</span></button>
+                    <button onClick={handleRecordLoss} disabled={isSubmitting} className="w-full px-6 py-3 bg-gradient-to-br from-rose-500 via-rose-600 to-rose-700 text-white rounded-xl hover:from-rose-600 hover:via-rose-700 hover:to-rose-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-bold shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center justify-center space-x-2 text-base"><Plus className="w-5 h-5" /><span>{isSubmitting ? 'Recording...' : 'Record Loss'}</span></button>
                   </div>
                 </div>
               </div>
@@ -287,17 +455,17 @@ const StockLossManagement: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {lossRecords.map((record, index) => {
+                  {losses.map((record, index) => {
                     const details = getReasonDetails(record.reason);
                     const Icon = details.icon as any;
                     return (
                       <tr key={record.id} className={clsx('hover:bg-gray-50 transition-colors group', index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30')}>
-                        <td className="px-4 py-3 whitespace-nowrap"><div className="flex items-center space-x-3"><Calendar className="w-4 h-4 text-gray-400" /><div><div className="text-sm font-medium text-gray-900">{record.date}</div><div className="text-xs text-gray-500">{record.time}</div></div></div></td>
-                        <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm font-mono font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded-lg">{record.batchId}</span></td>
-                        <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm text-gray-700">{record.product}</span></td>
+                        <td className="px-4 py-3 whitespace-nowrap"><div className="flex items-center space-x-3"><Calendar className="w-4 h-4 text-gray-400" /><div><div className="text-sm font-medium text-gray-900">{record.loss_date || record.date}</div></div></div></td>
+                        <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm font-mono font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded-lg">{record.batch_id}</span></td>
+                        <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm text-gray-700">{record.product_id || record.product}</span></td>
                         <td className="px-4 py-3 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">{record.quantity}</span><span className="text-xs text-gray-500 ml-1">units</span></td>
                         <td className="px-4 py-3 whitespace-nowrap"><div className={clsx('flex items-center space-x-2 px-3 py-1 rounded-full w-fit', details.bg)}><Icon className={clsx('w-4 h-4', details.text)} /><span className={clsx('text-xs font-medium', details.text)}>{record.reason}</span></div></td>
-                        <td className="px-4 py-3 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">{record.recordedBy.split(' ').map(n => n[0]).join('')}</span></div><span className="text-sm text-gray-600">{record.recordedBy}</span></div></td>
+                        <td className="px-4 py-3 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">{record.recorded_by?.split(' ').map((n:string) => n[0]).join('')}</span></div><span className="text-sm text-gray-600">{record.recorded_by}</span></div></td>
                         <td className="px-4 py-3 whitespace-nowrap"><div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity"><button className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><Eye className="w-4 h-4 text-gray-500" /></button><button onClick={() => handleDelete(record.id)} className="p-1 hover:bg-rose-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-rose-500" /></button></div></td>
                       </tr>
                     );
@@ -308,8 +476,8 @@ const StockLossManagement: React.FC = () => {
 
             <div className="px-6 py-4 border-t bg-gray-50">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-700">Showing <span className="font-medium">1-6</span> of <span className="font-medium">47</span> records</p>
-                <div className="flex items-center space-x-2"><button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">Previous</button><button className="px-3 py-1 bg-primary-600 text-white rounded-lg text-sm">1</button><button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">2</button><button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">3</button><button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">4</button><button className="px-3 py-1 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Next</button></div>
+                <p className="text-sm text-gray-700">Showing <span className="font-medium">1-{losses.length}</span> of <span className="font-medium">{losses.length}</span> records</p>
+                {/* TODO: implement real pagination controls */}
               </div>
             </div>
           </div>

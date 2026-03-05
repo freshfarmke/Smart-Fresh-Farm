@@ -33,10 +33,6 @@ export default function ProductionDashboard() {
     router.push('/production/dispatch');
   };
 
-  const handleRecordReturn = () => {
-    router.push('/production/returns');
-  };
-
   useEffect(() => {
     let mounted = true;
     async function loadStats() {

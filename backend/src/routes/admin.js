@@ -18,9 +18,9 @@ router.post('/create-user', async (req, res) => {
     const caller = callerData?.user;
     if (!caller) return res.status(401).json({ error: 'Invalid user' });
 
-    // Ensure caller has admin role in public.users
+    // Ensure caller has admin role in public.profiles
     const { data: profile, error: profileError } = await supabaseAdmin
-      .from('users')
+      .from('profiles')
       .select('role')
       .eq('user_id', caller.id)
       .single();
@@ -43,8 +43,8 @@ router.post('/create-user', async (req, res) => {
     const createdUser = createData?.user ?? createData;
     if (!createdUser?.id) return res.status(500).json({ error: 'Failed to create user' });
 
-    // Insert into public.users table
-    const { error: insertError } = await supabaseAdmin.from('users').insert({
+    // Insert into public.profiles table
+    const { error: insertError } = await supabaseAdmin.from('profiles').insert({
       user_id: createdUser.id,
       email,
       role,

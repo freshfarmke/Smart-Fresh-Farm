@@ -115,7 +115,7 @@ export default function NewBatchPage() {
         quantity_produced: p.quantity,
       }));
 
-      const { data: productsData, error: productsError } = await supabase
+      const { data: _productsData, error: productsError } = await supabase
         .from('batch_products')
         .insert(batchProducts)
         .select();

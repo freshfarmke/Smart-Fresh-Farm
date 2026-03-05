@@ -20,3 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_category ON public.expenses(category);
 -- Notes:
 -- - Matches frontend fields: description, amount, category, expense_date, notes
 -- - Use `expenses` table in frontend API calls for recordExpense
+--
+-- *Later migrations (see 2026-03-03_phase3_finance_schema.sql) added a
+-- `recorded_by` column to track which user created each row, as well as
+-- indexes on `recorded_by` and `created_at`.*

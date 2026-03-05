@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
-import type { ProductionBatch, CreateBatchInput, AddProductToBatchInput } from "@/types/database";
+import type { ProductionBatch, CreateBatchInput } from "@/types/database";
 import { createBatch, addProductToBatch } from "@/lib/api/production";
 
 interface Props {
@@ -21,7 +21,7 @@ export default function ProductionManager({ initialData }: Props) {
     setIsLoading(true);
     try {
       if (!form.batch_number) throw new Error("Batch number required");
-      const res = await createBatch("", form); // userId will be set in real auth flow
+      const res = await createBatch(form);
       if (!res.success) throw new Error(res.error.message);
       setBatches((b) => [res.data, ...b]);
       setSuccess("Batch created");
@@ -35,8 +35,8 @@ export default function ProductionManager({ initialData }: Props) {
 
   const handleAddProduct = async () => {
     // minimal prompt-based flow for dev - replace with proper form later
-    const batchId = prompt("Batch ID") || "";
-    const productId = prompt("Product ID") || "";
+    const batchId = Number(prompt("Batch ID") || "0");
+    const productId = Number(prompt("Product ID") || "0");
     const qty = Number(prompt("Quantity") || "0");
     if (!batchId || !productId || qty <= 0) return alert("Invalid input");
     setIsLoading(true);

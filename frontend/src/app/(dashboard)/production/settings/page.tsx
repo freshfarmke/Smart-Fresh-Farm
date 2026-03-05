@@ -1,5 +1,4 @@
 "use client";
-import React from 'react';
 import ProductionOperationsSettings from '@/components/production/ProductionOperationsSettings';
 
 export default function ProductionSettingsPage() {

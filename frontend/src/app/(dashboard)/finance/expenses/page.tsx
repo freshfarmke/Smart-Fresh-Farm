@@ -1,15 +1,21 @@
 "use client";
 
-"use client";
-
+import { Suspense } from 'react';
 import Link from 'next/link';
 import ExpensesManagement from '@/components/finance/ExpensesManagement';
 import { ChevronLeft } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
+
+function ExpensesManagementWrapper() {
+  return (
+    <Suspense fallback={<div className="text-gray-600">Loading...</div>}>
+      <ExpensesManagement />
+    </Suspense>
+  );
+}
 
 export default function FinanceExpensesPage() {
-  const pathname = usePathname();
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -22,12 +28,12 @@ export default function FinanceExpensesPage() {
         </div>
 
         <div>
-          <Link href={`${pathname}?add=1`} className="px-3 py-1.5 bg-[#8B5E3C] text-white rounded-md hover:bg-[#765033]">Add Expense</Link>
+          <Link href="/finance/expenses?add=1" className="px-3 py-1.5 bg-[#8B5E3C] text-white rounded-md hover:bg-[#765033]">Add Expense</Link>
         </div>
       </div>
 
       <div>
-        <ExpensesManagement />
+        <ExpensesManagementWrapper />
       </div>
     </div>
   );

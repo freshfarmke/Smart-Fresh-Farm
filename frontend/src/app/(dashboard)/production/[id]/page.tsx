@@ -25,7 +25,7 @@ export default function BatchDetailsPage() {
     try {
       // Fetch batch
       const { data: batchData, error: batchError } = await supabase
-        .from('batches')
+        .from('production_batches')
         .select(`
           id,
           batch_number,
@@ -39,7 +39,7 @@ export default function BatchDetailsPage() {
           updated_at,
           completed_at,
           dispatched_at,
-          users:created_by(name)
+          profiles:created_by(name)
         `)
         .eq('id', batchId)
         .single();

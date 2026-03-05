@@ -1,37 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Plus, Save, ArrowLeft } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Plus, ArrowLeft, Package, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import {
   getAllBatches
 } from '@/lib/api/production';
-import { getAllRouteRiders, createRouteRider, recordRouteReturn, getAllDispatches, getDispatchWithProducts } from '@/lib/api/routes';
-import { getAllProducts } from '@/lib/api/products';
+import { createRouteRider, getAllDispatches, getDispatchWithProducts } from '@/lib/api/routes';
 
 /**
- * Finance: Route Dispatch
- * - Create Dispatch (form moved from Production)
- * - Bread Return to Finance (record returns)
+ * Finance: Route Dispatch & Riders
+ * - Create Route Riders
+ * - View Dispatch Records
+ * - Bread returns are now on a separate page (/route-dispatch/bread-returns)
  *
  * Reuses the existing layout, spacing and form patterns.
  */
 export default function RouteDispatchPage() {
   const router = useRouter();
+  
+  // Navigation
+  const [activeSection, setActiveSection] = useState<'riders' | 'dispatches'>('dispatches');
+  const ridersRef = useRef<HTMLDivElement>(null);
+  const dispatchesRef = useRef<HTMLDivElement>(null);
   const [_batches, _setBatches] = useState<any[]>([]);
-  const [_riders, _setRiders] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [dispatches, setDispatches] = useState<any[]>([]);
   const [dispatchDetailsCache, setDispatchDetailsCache] = useState<Record<string, any>>({});
 
   const [_selectedBatch, _setSelectedBatch] = useState('');
-  const [_selectedRider, _setSelectedRider] = useState('');
-  const [_allocations, setAllocations] = useState<Record<string, number>>({});
   const [_notes, _setNotes] = useState('');
   const [_dispatchDate, _setDispatchDate] = useState<string>(new Date().toISOString().slice(0, 10));
-
-  const [selectedDispatch, setSelectedDispatch] = useState('');
-  const [returns, setReturns] = useState<Record<string, { quantity_returned: number; reason: string }>>({});
   // Create Route Rider form state
   const [newRiderName, setNewRiderName] = useState('');
   const [newRiderPhone, setNewRiderPhone] = useState('');
@@ -40,24 +39,19 @@ export default function RouteDispatchPage() {
   const [newRiderStatus, setNewRiderStatus] = useState<'active' | 'inactive'>('active');
   const [newRiderError, setNewRiderError] = useState<string | null>(null);
   const [isCreatingRider, setIsCreatingRider] = useState(false);
-  const [newRiderRawError, setNewRiderRawError] = useState<any>(null);
+
+  const scrollToSection = (section: 'riders' | 'dispatches') => {
+    setActiveSection(section);
+    setTimeout(() => {
+      const ref = section === 'riders' ? ridersRef : dispatchesRef;
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
 
   useEffect(() => {
     async function load() {
       const b = await getAllBatches();
       if (b.success) _setBatches(b.data || []);
-      const r = await getAllRouteRiders();
-      if (r.success) _setRiders(r.data || []);
-      const p = await getAllProducts();
-      if (p.success) {
-        setProducts(p.data || []);
-        // init allocations/returns for product ids
-        const initAlloc: Record<string, number> = {};
-        const initReturns: Record<string, any> = {};
-        (p.data || []).forEach((prd: any) => { initAlloc[prd.id] = 0; initReturns[prd.id] = { quantity_returned: 0, reason: 'good' }; });
-        setAllocations(initAlloc);
-        setReturns(initReturns);
-      }
       const d = await getAllDispatches();
       if (d.success) {
         setDispatches(d.data || []);
@@ -66,7 +60,7 @@ export default function RouteDispatchPage() {
         for (const dispatch of d.data || []) {
           const details = await getDispatchWithProducts(String(dispatch.id));
           if (details.success) {
-            cache[dispatch.id] = details.data;
+            cache[String(dispatch.id)] = details.data;
           }
         }
         setDispatchDetailsCache(cache);
@@ -79,10 +73,6 @@ export default function RouteDispatchPage() {
   //   setAllocations((prev) => ({ ...prev, [productId]: Math.max(0, parseInt(value || '0')) }));
   // };
 
-  const handleReturnChange = (productId: string, field: 'quantity_returned' | 'reason', value: string) => {
-    setReturns((prev) => ({ ...prev, [productId]: { ...prev[productId], [field]: field === 'quantity_returned' ? Math.max(0, parseInt(value || '0')) : value } }));
-  };
-
   // Finance no longer creates dispatches. Dispatch creation occurs in Production.
   // Finance is responsible for creating/managing Route Riders (see handleCreateRouteRider below).
 
@@ -94,7 +84,6 @@ export default function RouteDispatchPage() {
       if (!res.success) {
         // capture full error for debugging
         console.error('createRouteRider failed', res.error);
-        setNewRiderRawError(res.error || null);
         const msg: string = (res.error?.message as string) || (res.error?.details && (typeof res.error.details.error === 'string' ? res.error.details.error : JSON.stringify(res.error.details))) || 'Failed creating rider';
         setNewRiderError(msg);
         return;
@@ -102,186 +91,170 @@ export default function RouteDispatchPage() {
 
       // success
       setNewRiderError(null);
-      const r = await getAllRouteRiders();
-      if (r.success) _setRiders(r.data || []);
     } catch (e: any) {
       console.error(e);
-      setNewRiderRawError(e);
       setNewRiderError(e?.message || 'Failed to create route rider');
     } finally {
       setIsCreatingRider(false);
     }
   };
-  const handleSaveReturns = async () => {
-    try {
-      if (!selectedDispatch) { alert('Select a dispatch'); return; }
-      const productsToReturn = Object.entries(returns).filter(([, v]) => v.quantity_returned > 0).map(([product_id, v]: any) => ({ product_id, quantity_returned: v.quantity_returned, reason: v.reason }));
-      if (productsToReturn.length === 0) { alert('No returns to save'); return; }
-
-      // Validate dispatch and product assignments
-      let dispatchDetails = dispatchDetailsCache[selectedDispatch];
-      if (!dispatchDetails) {
-        const det = await getDispatchWithProducts(selectedDispatch);
-        if (!det.success) { alert('Failed to fetch dispatch details for validation'); return; }
-        dispatchDetails = det.data;
-        setDispatchDetailsCache((prev) => ({ ...prev, [selectedDispatch]: dispatchDetails }));
-      }
-
-      // Ensure returned products belong to the dispatch and quantities do not exceed dispatched quantities
-      const dispatchedMap: Record<string, number> = {};
-      (dispatchDetails.products || []).forEach((p: any) => { dispatchedMap[p.product_id || p.product?.id || p.id] = (dispatchedMap[p.product_id || p.product?.id || p.id] || 0) + (p.quantity_dispatched || p.quantity || 0); });
-
-      for (const r of productsToReturn) {
-        const allowed = dispatchedMap[r.product_id];
-        if (!allowed) { alert(`Product ${r.product_id} was not part of dispatch ${selectedDispatch}`); return; }
-        if (r.quantity_returned > allowed) { alert(`Returned quantity for product ${r.product_id} exceeds dispatched amount (${allowed})`); return; }
-      }
-
-      const payload = { dispatch_id: selectedDispatch, return_date: new Date().toISOString().slice(0,10), products: productsToReturn } as any;
-      const res = await recordRouteReturn(payload);
-      if (!res.success) throw new Error(res.error?.message || 'Failed to save returns');
-      alert('Returns recorded');
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || 'Failed to record returns');
-    }
-  };
-
+  
   const handleSubmitRider = async () => {
     setNewRiderError(null);
-    if (!newRiderName || !newRiderPhone) { setNewRiderError('Provide name and phone'); return; }
+    if (!newRiderName || !newRiderPhone) { 
+      const msg = 'Provide name and phone';
+      setNewRiderError(msg);
+      toast.error(msg);
+      return; 
+    }
     await handleCreateRouteRider({ name: newRiderName, phone: newRiderPhone, nickname: newRiderNickname, status: newRiderStatus } as any);
     if (!newRiderError) {
-      setNewRiderName(''); setNewRiderPhone(''); setNewRiderNickname(''); setNewRiderStatus('active');
+      toast.success('Route rider created successfully');
+      setNewRiderName(''); 
+      setNewRiderPhone(''); 
+      setNewRiderNickname(''); 
+      setNewRiderStatus('active');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Route Dispatch</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Create dispatches and record bread returns</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Route Dispatch & Returns</h1>
+              <p className="text-sm text-gray-600 mt-1">Manage route riders, dispatches, and bread returns</p>
+            </div>
+            <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-600 hover:text-gray-900"><ArrowLeft className="w-5 h-5" />Back</button>
+          </div>
+
+          {/* Modern Tab Navigation */}
+          <div className="flex gap-1 border-t border-gray-100 pt-3">
+            <button
+              onClick={() => scrollToSection('riders')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-all ${
+                activeSection === 'riders'
+                  ? 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-900 border-t-2 border-amber-500'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              Route Riders
+            </button>
+            <button
+              onClick={() => scrollToSection('dispatches')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-all ${
+                activeSection === 'dispatches'
+                  ? 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-900 border-t-2 border-blue-500'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              Dispatches
+            </button>
+            <button
+              onClick={() => router.push('/finance/route-dispatch/bread-returns')}
+              className="flex items-center gap-2 px-4 py-2 rounded-t-lg font-medium transition-all text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Bread Returns
+            </button>
+          </div>
         </div>
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-600 hover:text-gray-900"><ArrowLeft className="w-5 h-5" />Back</button>
       </div>
 
-      {/* Create Route Rider (Finance responsibility) */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Create Route Rider</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Finance: add and manage route riders</p>
-        </div>
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Rider Name</label>
-              <input value={newRiderName} onChange={(e) => setNewRiderName(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
+      {/* Content Sections */}
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-16">
+        
+        {/* Route Riders Section */}
+        <div ref={ridersRef} className="scroll-mt-40">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-amber-50 to-amber-100 border-b">
+              <h2 className="text-xl font-semibold text-amber-900 flex items-center gap-2">
+                <Plus className="w-5 h-5" />
+                Create Route Rider
+              </h2>
+              <p className="text-sm text-amber-800 mt-1">Finance: add and manage delivery riders</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-              <input value={newRiderPhone} onChange={(e) => setNewRiderPhone(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nickname</label>
-              <input value={newRiderNickname} onChange={(e) => setNewRiderNickname(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select value={newRiderStatus} onChange={(e) => setNewRiderStatus(e.target.value as any)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={handleSubmitRider} disabled={isCreatingRider} className="flex items-center space-x-2 px-4 py-2 bg-amber-700 text-white rounded-md hover:bg-amber-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Plus className="w-4 h-4" /><span>{isCreatingRider ? 'Creating…' : 'Create Rider'}</span></button>
-            <button onClick={() => { setNewRiderName(''); setNewRiderPhone(''); setNewRiderNickname(''); setNewRiderStatus('active'); }} className="px-4 py-2 border rounded-md">Reset</button>
-          </div>
-          {newRiderError ? <div className="text-sm text-red-600 mt-2">{newRiderError}</div> : null}
-          {newRiderRawError ? (
-            <pre className="mt-2 p-2 bg-gray-50 border rounded text-xs text-gray-700 overflow-auto" style={{maxHeight: 240}}>{JSON.stringify(newRiderRawError, null, 2)}</pre>
-          ) : null}
-        </div>
-      </div>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Dispatch Records</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Daily dispatch summary: rider, products, date, status</p>
-        </div>
-        <div className="p-4 space-y-4">
-          {dispatches.length === 0 ? (
-            <p className="text-gray-500 text-sm">No dispatches yet</p>
-          ) : (
-            dispatches.map((d: any) => (
-              <div key={d.id} className="border rounded-lg p-4 bg-gray-50 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">
-                      {(d as any).rider?.nickname || (d as any).rider?.full_name || `Rider #${d.rider_id}`}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      📅 {new Date(d.dispatch_date).toLocaleDateString()} · Status: <span className={`font-medium ${d.status === 'completed' ? 'text-green-600' : d.status === 'in_transit' ? 'text-blue-600' : 'text-gray-600'}`}>{d.status}</span>
-                    </p>
-                  </div>
-                  <span className="text-xs bg-gray-200 px-2 py-1 rounded text-gray-700">ID: {d.id}</span>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Rider Name</label>
+                  <input value={newRiderName} onChange={(e) => setNewRiderName(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
                 </div>
-                <div className="border-t pt-3">
-                  <p className="text-xs font-medium text-gray-600 uppercase mb-2">📦 Products Dispatched</p>
-                  {dispatchDetailsCache[d.id]?.products && dispatchDetailsCache[d.id].products.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {dispatchDetailsCache[d.id].products.map((dp: any) => (
-                        <div key={dp.id} className="flex justify-between text-sm bg-white p-2 rounded border-l-2 border-amber-500">
-                          <span className="text-gray-700 font-medium">{dp.product?.name || `Product #${dp.product_id}`}</span>
-                          <span className="text-amber-700 font-semibold">{dp.quantity_dispatched} units</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">No products loaded. Click to fetch details...</p>
-                  )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                  <input value={newRiderPhone} onChange={(e) => setNewRiderPhone(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Bread Returns Card */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-white border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Bread Return to Finance</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Record returned bread from routes</p>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div className="max-w-md">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Dispatch</label>
-            <input className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl" placeholder="Enter dispatch id (e.g. #D-2024-045)" value={selectedDispatch} onChange={(e) => setSelectedDispatch(e.target.value)} />
-          </div>
-
-          <div className="space-y-3">
-            {products.map((prd:any) => (
-              <div key={prd.id} className="flex items-center space-x-4">
-                <div className="w-1/3"><span className="text-sm font-medium text-gray-700">{prd.name}</span></div>
-                <div className="w-1/3"><input type="number" min={0} value={returns[prd.id]?.quantity_returned || 0} onChange={(e) => handleReturnChange(prd.id, 'quantity_returned', e.target.value)} className="w-28 px-2 py-1 border rounded-md" /></div>
-                <div className="w-1/3">
-                  <select value={returns[prd.id]?.reason || 'good'} onChange={(e) => handleReturnChange(prd.id, 'reason', e.target.value)} className="px-3 py-1 border rounded-md">
-                    <option value="good">Good</option>
-                    <option value="expired">Expired</option>
-                    <option value="unsold">Unsold</option>
-                    <option value="damaged">Damaged</option>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nickname</label>
+                  <input value={newRiderNickname} onChange={(e) => setNewRiderNickname(e.target.value)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select value={newRiderStatus} onChange={(e) => setNewRiderStatus(e.target.value as any)} className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                   </select>
                 </div>
               </div>
-            ))}
+              <div className="flex items-center gap-3 pt-4">
+                <button onClick={handleSubmitRider} disabled={isCreatingRider} className="flex items-center space-x-2 px-6 py-2 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"><Plus className="w-4 h-4" /><span>{isCreatingRider ? 'Creating…' : 'Create Rider'}</span></button>
+                <button onClick={() => { setNewRiderName(''); setNewRiderPhone(''); setNewRiderNickname(''); setNewRiderStatus('active'); }} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors">Reset</button>
+              </div>
+              {newRiderError ? <div className="text-sm text-red-600 mt-2 p-3 bg-red-50 rounded-lg">{newRiderError}</div> : null}
+            </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <button onClick={handleSaveReturns} className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"><Save className="w-4 h-4" /><span>Save Returns</span></button>
-            <button onClick={() => setReturns(products.reduce((acc:any, p:any) => ({ ...acc, [p.id]: { quantity_returned: 0, reason: 'good' } }), {}))} className="px-4 py-2 border rounded-md">Reset</button>
+        {/* Dispatches Section */}
+        <div ref={dispatchesRef} className="scroll-mt-40">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+              <h2 className="text-xl font-semibold text-blue-900 flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Dispatch Records
+              </h2>
+              <p className="text-sm text-blue-800 mt-1">Daily dispatch summary: rider, products, date, status</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {dispatches.length === 0 ? (
+                <p className="text-gray-500 text-sm py-8 text-center">No dispatches yet</p>
+              ) : (
+                dispatches.map((d: any) => (
+                  <div key={d.id} className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-gray-50 to-white hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          {(d as any).rider?.nickname || (d as any).rider?.full_name || `Rider #${d.rider_id}`}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          📅 {new Date(d.dispatch_date).toLocaleDateString()} · Status: <span className={`font-medium ${d.status === 'completed' ? 'text-green-600' : d.status === 'in_transit' ? 'text-blue-600' : 'text-amber-600'}`}>{d.status}</span>
+                        </p>
+                      </div>
+                      <span className="text-xs bg-gray-700 text-white px-3 py-1 rounded-full">ID: {d.id}</span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <p className="text-xs font-medium text-gray-600 uppercase mb-2 tracking-wide">📦 Products Dispatched</p>
+                      {dispatchDetailsCache[d.id]?.products && dispatchDetailsCache[d.id].products.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {dispatchDetailsCache[d.id].products.map((dp: any) => (
+                            <div key={dp.id} className="flex justify-between text-sm bg-white p-3 rounded border-l-4 border-blue-500">
+                              <span className="text-gray-700 font-medium">{dp.product?.name || `Product #${dp.product_id}`}</span>
+                              <span className="text-blue-700 font-semibold">{dp.quantity_dispatched} units</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No products loaded</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

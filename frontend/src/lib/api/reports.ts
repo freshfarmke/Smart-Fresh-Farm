@@ -84,3 +84,80 @@ export async function getProductionSummary(): Promise<ApiResponse<ProductionSumm
     return { success: false, error: { message: 'Failed to fetch production summary', details: error instanceof Error ? { error: error.message } : undefined } };
   }
 }
+
+export type RecentActivities = {
+  new_route_riders: number;
+  new_expenses: number;
+  stock_losses: number;
+  new_production_batches: number;
+  new_dispatches: number;
+  new_returns: number;
+};
+
+export async function getRecentActivities(): Promise<ApiResponse<RecentActivities>> {
+  try {
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // New route riders in last 7 days
+    const { count: newRouteRiders, error: ridersError } = await supabase
+      .from('route_riders')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (ridersError) throw ridersError;
+
+    // New expenses in last 7 days
+    const { count: newExpenses, error: expensesError } = await supabase
+      .from('expenses')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (expensesError) throw expensesError;
+
+    // Stock losses in last 7 days
+    const { count: stockLosses, error: lossesError } = await supabase
+      .from('stock_losses')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (lossesError) throw lossesError;
+
+    // New production batches in last 7 days
+    const { count: newBatches, error: batchesError } = await supabase
+      .from('production_batches')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (batchesError) throw batchesError;
+
+    // New dispatches in last 7 days
+    const { count: newDispatches, error: dispatchesError } = await supabase
+      .from('route_dispatches')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (dispatchesError) throw dispatchesError;
+
+    // New returns in last 7 days
+    const { count: newReturns, error: returnsError } = await supabase
+      .from('route_returns')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', last7Days);
+
+    if (returnsError) throw returnsError;
+
+    const activities = {
+      new_route_riders: newRouteRiders || 0,
+      new_expenses: newExpenses || 0,
+      stock_losses: stockLosses || 0,
+      new_production_batches: newBatches || 0,
+      new_dispatches: newDispatches || 0,
+      new_returns: newReturns || 0,
+    };
+
+    return { success: true, data: activities };
+  } catch (error) {
+    return { success: false, error: { message: 'Failed to fetch recent activities', details: error instanceof Error ? { error: error.message } : undefined } };
+  }
+}

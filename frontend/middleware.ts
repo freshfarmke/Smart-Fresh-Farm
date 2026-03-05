@@ -19,12 +19,12 @@ function isAllowed(pathname: string, role: string | null) {
   if (role === "admin") return true;
 
   const rules: Array<{ path: string; roles: string[] }> = [
-    { path: "/dashboard/production", roles: ["production"] },
-    { path: "/dashboard/routes", roles: ["production"] },
-    { path: "/dashboard/institutions", roles: ["production"] },
-    { path: "/dashboard/finance", roles: ["finance"] },
-  ];
-
+      { path: "/dashboard/production", roles: ["production"] },
+      { path: "/dashboard/routes", roles: ["production"] },
+      { path: "/dashboard/institutions", roles: ["production"] },
+      // finance team is allowed to access any /finance* path
+      { path: "/finance", roles: ["finance"] },
+    ];
   for (const r of rules) {
     if (pathMatches(pathname, r.path)) return r.roles.includes(role);
   }
@@ -54,7 +54,8 @@ function createSupabaseServer(request: NextRequest) {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (!pathname.startsWith("/dashboard")) return NextResponse.next();
+  // only guard dashboard and finance areas, let public pages through
+  if (!pathname.startsWith("/dashboard") && !pathname.startsWith('/finance')) return NextResponse.next();
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SERVICE_ROLE_KEY) {
     const url = req.nextUrl.clone();

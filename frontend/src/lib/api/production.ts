@@ -86,7 +86,6 @@ export async function getBatchWithProducts(
  * Create new production batch (production role required)
  */
 export async function createBatch(
-  userId: string,
   input: CreateBatchInput
 ): Promise<ApiResponse<ProductionBatch>> {
   try {

@@ -356,14 +356,17 @@ const response = await getExpensesByDateRange(
 // Get expenses by category
 const response = await getExpensesByCategory('fuel');
 
-// Record expense (finance/admin only)
-const response = await recordExpense(userId, {
+// Record expense (finance/admin only).  The logged-in user is automatically
+// stamped in the `recorded_by` column; you do *not* provide it.
+const response = await recordExpense({
   description: "Fuel purchase",
   amount: 1000,
   category: "fuel",
   expense_date: "2025-02-17",
   notes: "Morning fuel"
 });
+// The `Expense` object returned will include a `recorded_by` field where the
+// server placed the name/email of the user who created the record.
 
 // Get total expenses for date range
 const response = await getTotalExpenses(
@@ -567,7 +570,7 @@ import {
 import { recordExpense } from '@/lib/api';
 
 try {
-  const response = await recordExpense(userId, expenseData);
+  const response = await recordExpense(expenseData);
   
   if (response.success) {
     console.log('Expense recorded:', response.data);

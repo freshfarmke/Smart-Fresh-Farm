@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { usePreferences, parseCurrencyCode } from '@/lib/preferences';
 import { getAllProducts, updateProduct, deleteProduct } from '@/lib/api/products';
 import AddProductForm from '@/components/forms/AddProductForm';
 import { Edit3, Trash2, Save, X } from 'lucide-react';
@@ -35,8 +36,10 @@ export default function FinanceProductsPage() {
     load();
   }, []);
 
+  const { prefs } = usePreferences();
+  const currencyCode = parseCurrencyCode(prefs.currency);
   const formatCurrency = (value: number | null | undefined) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value ?? 0);
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(value ?? 0);
 
   return (
     <div className="space-y-6">
@@ -87,7 +90,7 @@ export default function FinanceProductsPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <Button size="sm" variant="ghost" onClick={async () => {
+                              <Button size="sm" variant="outline" onClick={async () => {
                                 // Save
                                 try {
                                   const updates: any = {
@@ -108,7 +111,7 @@ export default function FinanceProductsPage() {
                               }}>
                                 <Save size={16} />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditValues(null); }}>
+                              <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditValues(null); }}>
                                 <X size={16} />
                               </Button>
                             </div>

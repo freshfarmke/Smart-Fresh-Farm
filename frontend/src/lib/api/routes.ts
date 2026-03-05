@@ -24,7 +24,6 @@ import type {
   RecordReturnInput,
   RecordCollectionInput,
   ApiResponse,
-  Product,
 } from '@/types/database';
 
 // ============= ROUTE RIDERS =============
@@ -227,7 +226,6 @@ export async function getDispatchWithProducts(
  * Create new route dispatch
  */
 export async function createDispatch(
-  userId: string,
   input: CreateDispatchInput
 ): Promise<ApiResponse<RouteDispatch>> {
   try {

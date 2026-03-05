@@ -7,17 +7,19 @@
 -- Copy all content from SUPABASE_SCHEMA.sql
 -- Go to: Supabase Dashboard → SQL Editor → New Query
 -- Paste entire content and click "Run"
+```sql
+-- if you still have an old `users` table and kept the role column there:
+-- **replace <USER_UUID> with a real UUID from your table**
+UPDATE public.users
+SET role = 'finance'
+WHERE id = '<USER_UUID>';
+
+-- with the current schema (profiles table)
+-- **replace <USER_UUID> with the auth user ID (UUID) stored in profiles.user_id**
+UPDATE public.profiles
+SET role = 'finance'
+WHERE user_id = '<USER_UUID>';
 ```
-
-### 2. Set Environment Variables (1 minute)
-```env
-# frontend/.env.local
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-NEXT_PUBLIC_API_URL=http://localhost:5000
-
-# backend/.env
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
 ### 3. Create First Admin User (1 minute)
@@ -32,9 +34,15 @@ curl -X POST http://localhost:5000/admin/create-user \
   }'
 ```
 
-Or use Supabase directly:
-1. Go to Supabase → SQL Editor
-2. Run: `INSERT INTO public.users (id, email, name, role) VALUES ('uuid-here', 'admin@bakery.com', 'Admin User', 'admin');`
+*This endpoint creates the Auth user and a corresponding profile record.*
+
+If you prefer to run SQL yourself, insert into **profiles** rather than `users`:
+
+```sql
+-- create auth user first (supabase.auth.admin.createUser)
+INSERT INTO public.profiles (user_id, email, name, role)
+VALUES ('<USER_UUID>', 'admin@bakery.com', 'Admin User', 'admin');  -- use a real UUID, e.g. from auth.users table
+```
 
 ### 4. Create Production User (1 minute)
 Using admin API:
@@ -152,7 +160,8 @@ WHERE b.id = 'batch-uuid-here';
 
 ### View user permissions
 ```sql
-SELECT id, email, name, role FROM users 
+-- look at the profile table (roles are stored here)
+SELECT user_id, email, name, role FROM profiles 
 WHERE email = 'production@bakery.com';
 ```
 

@@ -53,25 +53,17 @@ export function LoginForm() {
         return;
       }
 
-      // Fetch user role from public.users
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id) // Make sure column matches table (id)
-        .single();
-
-      if (profileError) {
-        console.warn('Profile fetch error:', profileError.message);
-        router.push(ROUTES.DASHBOARD); // fallback
-        return;
-      }
-
-      // Role-based redirect
-      const role = profile?.role;
-      if (role === 'admin') router.push('/admin');
-      else if (role === 'finance') router.push('/finance');
-      else if (role === 'production') router.push('/production');
-      else router.push(ROUTES.DASHBOARD);
+      // determine role using auth helper (reads profiles table)
+      import('@/lib/auth').then(async ({ getUserRole }) => {
+        const role = await getUserRole(user.id);
+        if (role === 'admin') router.push('/admin');
+        else if (role === 'finance') router.push('/finance');
+        else if (role === 'production') router.push('/production');
+        else router.push(ROUTES.DASHBOARD);
+      }).catch((err) => {
+        console.warn('Failed to fetch role:', err);
+        router.push(ROUTES.DASHBOARD);
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');

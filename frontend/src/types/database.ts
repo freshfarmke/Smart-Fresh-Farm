@@ -41,6 +41,24 @@ export interface CreateProductInput {
   active?: boolean;
 }
 
+// Institutions
+export interface Institution {
+  id: number; // bigint
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  address: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateInstitutionInput {
+  name: string;
+  contact_person?: string;
+  phone?: string;
+  address?: string;
+}
+
 // Production
 export interface ProductionBatch {
   id: number; // bigint
@@ -150,7 +168,7 @@ export interface RouteDispatch {
 export interface RouteDispatchProduct {
   id: number; // bigint
   dispatch_id: number; // bigint
-  product_id: number; // bigint
+  product_id: number | string; // Can be bigint or UUID string
   quantity_dispatched: number;
   quantity_sold?: number;
   quantity_returned?: number;
@@ -194,7 +212,7 @@ export interface RecordReturnInput {
   dispatch_id: number; // bigint
   return_date: string;
   products: Array<{
-    product_id: number; // bigint
+    product_id: number | string; // Can be bigint or UUID string
     quantity_returned: number;
     reason: 'good' | 'expired' | 'unsold' | 'damaged';
   }>;
@@ -203,22 +221,40 @@ export interface RecordReturnInput {
 
 // Route Collections
 export interface RouteCollection {
-  id: number; // bigint
-  dispatch_id: number; // bigint
+  id: string; // UUID
+  dispatch_id: string; // UUID
   amount_collected: number;
   collection_date: string;
   payment_method?: string;
   notes: string | null;
   created_at: string;
+  dispatch?: {
+    id: string;
+    rider_id: string;
+    batch_id: string;
+    dispatch_date: string;
+    status: string;
+    rider?: {
+      id: string;
+      full_name: string;
+      nickname?: string;
+      phone?: string;
+    };
+  };
 }
 
 export interface RouteCollectionProduct {
-  id: number; // bigint
-  collection_id: number; // bigint
-  product_id: number; // bigint
+  id: string; // UUID
+  collection_id: string; // UUID
+  product_id: string; // UUID
   quantity_sold: number;
   unit_price?: number;
   created_at: string;
+  product?: {
+    id: string;
+    name: string;
+    retail_price?: number;
+  };
 }
 
 // Production-specific product batch (production_batches table)
@@ -242,12 +278,12 @@ export interface CreateProductionBatchInput {
 }
 
 export interface RecordCollectionInput {
-  dispatch_id: number; // bigint
+  dispatch_id: string; // UUID
   amount_collected: number;
   collection_date: string;
   payment_method: string;
   products: Array<{
-    product_id: number; // bigint
+    product_id: string; // UUID
     quantity_sold: number;
   }>;
   notes?: string;
@@ -310,6 +346,7 @@ export interface Expense {
   category: string;
   expense_date: string;
   notes: string | null;
+  recorded_by?: string | null; // name or email of user who logged the expense
   created_at: string;
   updated_at?: string;
 }
@@ -320,6 +357,7 @@ export interface RecordExpenseInput {
   category: string;
   expense_date: string;
   notes?: string;
+  recorded_by?: string;
 }
 
 // Stock Losses
@@ -341,6 +379,35 @@ export interface RecordStockLossInput {
   loss_date: string;
   notes?: string;
 }
+
+// Finance Activity (unified type for activity feed)
+export type FinanceActivity =
+  | {
+      type: 'expense';
+      id: string;
+      amount: number;
+      category: string;
+      description: string;
+      created_at: string;
+      recorded_by?: string;
+    }
+  | {
+      type: 'collection';
+      id: string;
+      amount: number;
+      dispatch_id: string;
+      created_at: string;
+      collected_by?: string;
+    }
+  | {
+      type: 'stock_loss';
+      id: string;
+      quantity: number;
+      product_id: string;
+      reason: string;
+      created_at: string;
+      recorded_by?: string;
+    };
 
 /**
  * API Response types

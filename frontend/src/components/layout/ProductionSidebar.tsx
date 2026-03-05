@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   Home,
-  Package,
   Truck,
   Building2,
   Store,

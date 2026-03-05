@@ -17,13 +17,25 @@ import type { UserProfile, AuthUser } from '@/types/database';
 
 /**
  * Get current user session from Supabase Auth
+ * Always returns AuthUser with guaranteed id and email, or null
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    return user || null;
+    
+    // Enforce strict type: email must be defined
+    if (!user || !user.email || !user.id) {
+      return null;
+    }
+    
+    return {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata,
+      app_metadata: user.app_metadata,
+    } as AuthUser;
   } catch (error) {
     console.error('Error getting current user:', error);
     return null;
@@ -53,10 +65,12 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 /**
  * Check if user has specific role
  */
-export async function hasRole(
-  userId: string,
+// helper used internally by role-checking functions
+async function userHasRole(
+  userId: string | null | undefined,
   requiredRole: 'admin' | 'production' | 'finance'
 ): Promise<boolean> {
+  if (!userId) return false;
   const profile = await getUserProfile(userId);
   if (!profile) return false;
 
@@ -64,6 +78,13 @@ export async function hasRole(
   if (profile.role === 'admin') return true;
 
   return profile.role === requiredRole;
+}
+
+export async function hasRole(
+  userId: string,
+  requiredRole: 'admin' | 'production' | 'finance'
+): Promise<boolean> {
+  return userHasRole(userId, requiredRole);
 }
 
 /**
@@ -80,12 +101,14 @@ export async function canProduceOrDispatch(userId: string): Promise<boolean> {
 /**
  * Check if user can perform finance tasks
  * Allowed: admin, finance roles
+ * Accepts either a user id (string) or the AuthUser object
  */
-export async function canManageFinance(userId: string): Promise<boolean> {
-  const profile = await getUserProfile(userId);
-  if (!profile) return false;
-
-  return profile.role === 'admin' || profile.role === 'finance';
+export async function canManageFinance(
+  user: string | AuthUser | null | undefined
+): Promise<boolean> {
+  if (!user) return false;
+  const userId = typeof user === 'string' ? user : user.id;
+  return userHasRole(userId, 'finance');
 }
 
 /**

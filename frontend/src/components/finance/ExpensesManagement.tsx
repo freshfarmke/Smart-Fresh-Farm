@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { useSearchParams } from 'next/navigation';
+import { usePreferences, parseCurrencyCode } from '@/lib/preferences';
+import { getAllExpenses, recordExpense, deleteExpense } from '@/lib/api/finance';
+import toast from 'react-hot-toast';
 import {
   TrendingDown,
   Calendar,
@@ -13,7 +14,6 @@ import {
   MoreVertical,
   ChevronLeft,
   ChevronRight,
-  Plus,
   User,
   Zap,
   Truck as TruckIcon,
@@ -23,19 +23,23 @@ import {
 import clsx from 'clsx';
 
 const ExpensesManagement: React.FC = () => {
-    const searchParams = useSearchParams();
-    const [showAddExpense, setShowAddExpense] = useState<boolean>(() => {
-      try {
-        return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === '1';
-      } catch {
-        return false;
+    const [searchParams, setSearchParams] = useState<URLSearchParams | null>(null);
+    const [showAddExpense, setShowAddExpense] = useState<boolean>(false);
+
+    // Initialize search params on client side only
+    useEffect(() => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        setSearchParams(params);
+        setShowAddExpense(params.get('add') === '1');
       }
-    });
+    }, []);
 
     useEffect(() => {
-      // also react to navigation-driven search param when mounted client-side
-      if (!searchParams) return;
-      if (searchParams.get('add') === '1') setShowAddExpense(true);
+      // React to navigation-driven search param changes
+      if (searchParams && searchParams.get('add') === '1') {
+        setShowAddExpense(true);
+      }
     }, [searchParams]);
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -43,6 +47,8 @@ const ExpensesManagement: React.FC = () => {
     // Live data
     const [expenses, setExpenses] = useState<any[]>([]);
     const [stats, setStats] = useState({ totalExpenses: 0, monthlyAverage: 0, largestExpense: 0, categories: 0 });
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
     // Add expense form state
     const [formDate, setFormDate] = useState('');
@@ -50,6 +56,18 @@ const ExpensesManagement: React.FC = () => {
     const [formAmount, setFormAmount] = useState('');
     const [formRecordedBy, setFormRecordedBy] = useState('');
     const [formNotes, setFormNotes] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    // pre-fill recorded by when component mounts (use friendly name if available)
+    useEffect(() => {
+      import('@/lib/auth').then(async ({ getCurrentUser }) => {
+        const u = await getCurrentUser();
+        if (u) {
+          const name = (u.user_metadata && (u.user_metadata as any).name) || u.email || u.id;
+          setFormRecordedBy(name);
+        }
+      });
+    }, []);
 
     const categories = [
       'All Categories',
@@ -63,32 +81,65 @@ const ExpensesManagement: React.FC = () => {
       'Marketing',
     ];
 
-    useEffect(() => {
-      fetchExpenses();
-    }, []);
-
-    async function fetchExpenses() {
+    // Load expenses function
+    const loadExpenses = async () => {
       try {
-        const { data, error } = await supabase
-          .from('expenses')
-          .select('*')
-          .order('expense_date', { ascending: false })
-          .limit(100);
-
-        if (error) throw error;
-        const rows = data || [];
-        setExpenses(rows);
-
-        // Simple stats
-        const total = rows.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
-        const largest = rows.reduce((m: number, r: any) => Math.max(m, Number(r.amount || 0)), 0);
-        const categoriesCount = Array.from(new Set(rows.map((r: any) => r.category))).length;
-        const monthlyAvg = rows.length ? total / Math.max(1, new Date().getMonth() + 1) : 0;
-        setStats({ totalExpenses: total, monthlyAverage: monthlyAvg, largestExpense: largest, categories: categoriesCount });
+        setLoading(true);
+        setError(null);
+        
+        // Build filters
+        const filters: any = {};
+        if (dateRange.start) filters.startDate = dateRange.start;
+        if (dateRange.end) filters.endDate = dateRange.end;
+        if (selectedCategory && selectedCategory !== 'all') filters.category = selectedCategory;
+        
+        const result = await getAllExpenses();
+        if (result.success) {
+          let filteredExpenses = result.data;
+          
+          // Apply client-side filters if needed
+          if (filters.startDate) {
+            filteredExpenses = filteredExpenses.filter(exp => exp.expense_date >= filters.startDate);
+          }
+          if (filters.endDate) {
+            filteredExpenses = filteredExpenses.filter(exp => exp.expense_date <= filters.endDate);
+          }
+          if (filters.category) {
+            filteredExpenses = filteredExpenses.filter(exp => exp.category === filters.category);
+          }
+          
+          setExpenses(filteredExpenses);
+          
+          // Compute stats
+          const total = filteredExpenses.reduce((s: number, r: any) => s + Number(r.amount || 0), 0);
+          const largest = filteredExpenses.reduce((m: number, r: any) => Math.max(m, Number(r.amount || 0)), 0);
+          const categoriesCount = Array.from(new Set(filteredExpenses.map((r: any) => r.category))).length;
+          const monthlyAvg = filteredExpenses.length ? total / Math.max(1, new Date().getMonth() + 1) : 0;
+          setStats({ totalExpenses: total, monthlyAverage: monthlyAvg, largestExpense: largest, categories: categoriesCount });
+        } else {
+          setError(result.error?.message || 'Failed to load expenses');
+        }
       } catch (err) {
-        console.error('Failed to fetch expenses', err);
+        console.error('Failed to load expenses', err);
+        setError('Unable to load expenses');
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+
+    // build key based on filters (for dependency tracking)
+    const buildKey = () => {
+      const params = new URLSearchParams();
+      if (dateRange.start) params.set('start', dateRange.start);
+      if (dateRange.end) params.set('end', dateRange.end);
+      if (selectedCategory && selectedCategory !== 'all') params.set('category', selectedCategory);
+      return params.toString();
+    };
+    
+    // Load data when filters change
+    useEffect(() => {
+      loadExpenses();
+    }, [buildKey()]);
 
     const getCategoryIcon = (category: string) => {
       switch (category) {
@@ -130,46 +181,73 @@ const ExpensesManagement: React.FC = () => {
       }
     };
 
+    const { prefs } = usePreferences();
+    const currencyCode = parseCurrencyCode(prefs.currency);
+    const currencySymbol = prefs.currency.match(/\(([^)]+)\)/)?.[1] || '$';
     const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
     };
 
     const handleApplyFilters = () => {
-      // For now refetch (could send params)
-      fetchExpenses();
+      setError(null);
+      loadExpenses(); // Reload with new filters
     };
 
-    const handleEdit = (id: string) => {
-      // TODO: edit expense (open modal)
+    const handleEdit = (_id?: string) => {
+      // TODO: implement edit modal and call PUT /api/finance/expenses/{id}
+      // `_id` available when we start editing a real record
     };
     const handleDelete = async (id: string) => {
       try {
-        const { error } = await supabase.from('expenses').delete().eq('id', id);
-        if (error) throw error;
-        fetchExpenses();
+        const result = await deleteExpense(id);
+        if (result.success) {
+          loadExpenses(); // Reload expenses
+          toast.success('Expense deleted successfully');
+        } else {
+          throw new Error(result.error?.message || 'Delete failed');
+        }
       } catch (err) {
         console.error('Failed to delete expense', err);
+        setError('Delete failed');
+        const msg = err instanceof Error ? err.message : 'Delete failed';
+        toast.error(msg);
+        return;
       }
     };
 
     const handleSaveExpense = async () => {
       try {
+        if (!formCategory || Number(formAmount) <= 0) {
+          setError('Category and positive amount required');
+          toast.error('Category and positive amount required');
+          return;
+        }
+        setIsSaving(true);
         const payload = {
           description: formNotes || `${formCategory} expense`,
           amount: parseFloat(formAmount || '0'),
           category: formCategory,
           expense_date: formDate || new Date().toISOString().split('T')[0],
-          notes: formNotes || null,
-        };
-        const { data, error } = await supabase.from('expenses').insert([payload]).select().single();
-        if (error) throw error;
-        // clear form
-        setFormAmount(''); setFormCategory(''); setFormDate(''); setFormNotes(''); setFormRecordedBy('');
-        setShowAddExpense(false);
-        fetchExpenses();
+          notes: formNotes || undefined,          recorded_by: formRecordedBy,        };
+
+        const result = await recordExpense(payload);
+        if (result.success) {
+          // clear input fields but keep recorded_by
+          setFormAmount(''); setFormCategory(''); setFormDate(''); setFormNotes('');
+          setShowAddExpense(false);
+          loadExpenses(); // Reload expenses
+          toast.success('Expense added successfully');
+        } else {
+          throw new Error(result.error?.message || 'Failed to save expense');
+        }
       } catch (err) {
         console.error('Failed to save expense', err);
-        setError('Failed to save expense');
+        const msg = err instanceof Error ? err.message : 'Failed to save expense';
+        setError(msg);
+        toast.error(msg);
+        return;
+      } finally {
+        setIsSaving(false);
       }
     };
 
@@ -247,7 +325,15 @@ const ExpensesManagement: React.FC = () => {
                         <Filter className="w-4 h-4" />
                         <span>Apply Filters</span>
                       </button>
-                      <button onClick={() => setShowAddExpense(true)} className="px-4 py-2 border rounded-md text-primary-700 hover:bg-primary-50">Add Expense</button>
+                      <button
+                        onClick={() => {
+                          setShowAddExpense(true);
+                          toast('Opening expense entry form', { icon: '➕' });
+                        }}
+                        className="px-4 py-2 border rounded-md text-primary-700 hover:bg-primary-50"
+                      >
+                        Add Expense
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -279,13 +365,19 @@ const ExpensesManagement: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">{currencySymbol}</span>
                         <input type="number" step="0.01" value={formAmount} onChange={e => setFormAmount(e.target.value)} className="w-full pl-8 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="0.00" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Recorded By</label>
-                      <input type="text" value={formRecordedBy} onChange={e => setFormRecordedBy(e.target.value)} className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Your name" />
+                      <input
+                        type="text"
+                        value={formRecordedBy}
+                        readOnly
+                        className="w-full px-3 py-2 border rounded-md bg-gray-100 cursor-not-allowed"
+                        placeholder="Your name"
+                      />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
@@ -293,8 +385,14 @@ const ExpensesManagement: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex justify-end space-x-3 mt-4">
+                    <button
+                      onClick={handleSaveExpense}
+                      disabled={isSaving}
+                      className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      {isSaving ? 'Adding...' : 'Add Expense'}
+                    </button>
                     <button onClick={() => setShowAddExpense(false)} className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button onClick={handleSaveExpense} className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Save Expense</button>
                   </div>
                 </div>
               </div>
@@ -305,43 +403,54 @@ const ExpensesManagement: React.FC = () => {
               <div className="px-5 py-4 border-b"><h2 className="text-lg font-semibold text-gray-900">Recent Expenses</h2></div>
 
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded By</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {expenses.map((expense) => {
-                      const CategoryIcon = getCategoryIcon(expense.category);
-                      return (
-                        <tr key={expense.id} className="hover:bg-gray-50">
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2"><Calendar className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-900">{expense.expense_date}</span></div>
-                          </td>
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2"><span className={clsx('p-1 rounded', getCategoryColor(expense.category))}><CategoryIcon className="w-4 h-4" /></span><span className="text-sm font-medium text-gray-900">{expense.category}</span></div>
-                          </td>
-                          <td className="px-5 py-4 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">{formatCurrency(Number(expense.amount) || 0)}</span></td>
-                          <td className="px-5 py-4 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">EB</span></div><span className="text-sm text-gray-600">{expense.recorded_by || ''}</span></div></td>
-                          <td className="px-5 py-4"><p className="text-sm text-gray-600 truncate max-w-xs">{expense.notes}</p></td>
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <button onClick={() => handleEdit(expense.id)} className="p-1 hover:bg-secondary rounded text-blue-600"><Edit className="w-4 h-4" /></button>
-                              <button onClick={() => handleDelete(expense.id)} className="p-1 hover:bg-secondary rounded text-error-600"><Trash2 className="w-4 h-4" /></button>
-                              <button className="p-1 hover:bg-secondary rounded"><MoreVertical className="w-4 h-4 text-gray-600" /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {loading && (
+                  <div className="p-6 text-center text-gray-500">Loading expenses...</div>
+                )}
+                {!loading && error && (
+                  <div className="p-6 text-center text-red-500">{error}</div>
+                )}
+                {!loading && !error && expenses.length === 0 && (
+                  <div className="p-6 text-center text-gray-500">No expense records found.</div>
+                )}
+                {!loading && !error && expenses.length > 0 && (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded By</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {expenses.map((expense) => {
+                        const CategoryIcon = getCategoryIcon(expense.category);
+                        return (
+                          <tr key={expense.id} className="hover:bg-gray-50">
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="flex items-center space-x-2"><Calendar className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-900">{expense.expense_date}</span></div>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="flex items-center space-x-2"><span className={clsx('p-1 rounded', getCategoryColor(expense.category))}><CategoryIcon className="w-4 h-4" /></span><span className="text-sm font-medium text-gray-900">{expense.category}</span></div>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">{formatCurrency(Number(expense.amount) || 0)}</span></td>
+                            <td className="px-5 py-4 whitespace-nowrap"><div className="flex items-center space-x-2"><div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center"><span className="text-xs font-medium text-primary-700">EB</span></div><span className="text-sm text-gray-600">{expense.recorded_by || ''}</span></div></td>
+                            <td className="px-5 py-4"><p className="text-sm text-gray-600 truncate max-w-xs">{expense.notes}</p></td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="flex items-center space-x-2">
+                                <button onClick={() => handleEdit(expense.id)} className="p-1 hover:bg-secondary rounded text-blue-600"><Edit className="w-4 h-4" /></button>
+                                <button onClick={() => handleDelete(expense.id)} className="p-1 hover:bg-secondary rounded text-error-600"><Trash2 className="w-4 h-4" /></button>
+                                <button className="p-1 hover:bg-secondary rounded"><MoreVertical className="w-4 h-4 text-gray-600" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               <div className="px-5 py-3 border-t bg-gray-50">

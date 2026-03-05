@@ -58,7 +58,7 @@ frontend/src/
 - `total_quantity` (INT) - Number of different products
 - `total_units` (INT) - Total unit count across all products
 - `notes` (TEXT)
-- `created_by` (UUID) - References users.id
+- `created_by` (UUID) - References profiles.user_id
 - `created_at`, `updated_at` (TIMESTAMP)
 - `completed_at`, `dispatched_at` (TIMESTAMP)
 
@@ -348,7 +348,7 @@ For issues or questions:
 2. Verify RLS policies are configured correctly
 3. Check browser console for JavaScript errors
 4. Ensure all environment variables are set
-5. Verify user has correct role in users table
+5. Verify user has correct role in **profiles** table
 
 ---
 

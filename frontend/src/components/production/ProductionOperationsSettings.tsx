@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getAllProductionSettings, upsertProductionSetting } from '@/lib/api/settings';
 
 const defaultKeys = {
@@ -21,7 +21,7 @@ export default function ProductionOperationsSettings() {
       const res = await getAllProductionSettings();
       if (!mounted) return;
       if (res.success) {
-        const map = { ...defaultKeys };
+        const map: Record<string, any> = { ...defaultKeys };
         (res.data || []).forEach((row:any) => {
           try {
             map[row.key] = row.value;

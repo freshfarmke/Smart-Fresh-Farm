@@ -16,6 +16,7 @@ import { getAllBatches } from '@/lib/api/production';
 import { getAllRouteRiders, createDispatch, addProductToDispatch } from '@/lib/api/routes';
 import { getAllProducts } from '@/lib/api/products';
 import { supabase } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
 
 /**
  * Routes & Dispatch Management Page
@@ -82,7 +83,7 @@ export default function RoutesDispatch() {
         dispatch_date: new Date().toISOString().slice(0, 10),
         notes: undefined,
       } as any;
-      const res = await createDispatch(user.user.id, payload as any);
+      const res = await createDispatch(payload as any);
       if (!res.success) throw new Error(res.error?.message || 'Failed creating dispatch');
       const dispatchId = res.data.id;
       for (const [productId, qty] of Object.entries(allocations)) {
@@ -91,13 +92,13 @@ export default function RoutesDispatch() {
           await addProductToDispatch({ dispatch_id: dispatchId, product_id: productId, quantity_dispatched: n } as any);
         }
       }
-      alert('Dispatch created');
+      toast.success('Dispatch created successfully');
       // reset allocations
       setAllocations(products.reduce((acc: any, p: any) => ({ ...acc, [p.id]: 0 }), {}));
       setSelectedBatch(''); setSelectedRider('');
     } catch (e: any) {
       console.error(e);
-      alert(e?.message || 'Failed to create dispatch');
+      toast.error(e?.message || 'Failed to create dispatch');
     } finally {
       setIsCreatingDispatch(false);
     }

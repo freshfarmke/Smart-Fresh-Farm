@@ -12,7 +12,7 @@ interface Props {
 export default function ProductsManager({ initialData }: Props) {
   const [products, setProducts] = useState<Product[]>(initialData || []);
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState<CreateProductInput>({ name: "", unit_price: 0, cost_per_unit: 0 });
+  const [form, setForm] = useState<CreateProductInput>({ name: "", wholesale_price: 0, retail_price: 0 });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -25,7 +25,7 @@ export default function ProductsManager({ initialData }: Props) {
       if (!res.success) throw new Error(res.error.message);
       setProducts((p) => [res.data, ...p]);
       setSuccess("Product created");
-      setForm({ name: "", unit_price: 0, cost_per_unit: 0 });
+      setForm({ name: "", wholesale_price: 0, retail_price: 0 });
     } catch (err: any) {
       setError(err?.message || "Failed to create product");
     } finally {
@@ -34,11 +34,11 @@ export default function ProductsManager({ initialData }: Props) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("Delete product?")) return;
     setIsLoading(true);
     try {
-      const res = await deleteProduct(id);
+      const res = await deleteProduct(String(id));
       if (!res.success) throw new Error(res.error.message);
       setProducts((p) => p.filter((x) => x.id !== id));
       setSuccess("Product deleted");
@@ -50,12 +50,12 @@ export default function ProductsManager({ initialData }: Props) {
     }
   };
 
-  const handleUpdate = async (id: string) => {
+  const handleUpdate = async (id: number) => {
     const name = prompt("New name") || undefined;
     if (!name) return;
     setIsLoading(true);
     try {
-      const res = await updateProduct(id, { name });
+      const res = await updateProduct(String(id), { name });
       if (!res.success) throw new Error(res.error.message);
       setProducts((p) => p.map((it) => (it.id === id ? res.data : it)));
       setSuccess("Product updated");
@@ -76,16 +76,16 @@ export default function ProductsManager({ initialData }: Props) {
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
         <Input
-          label="Unit Price"
+          label="Wholesale Price"
           type="number"
-          value={String(form.unit_price)}
-          onChange={(e) => setForm({ ...form, unit_price: Number(e.target.value) })}
+          value={String(form.wholesale_price)}
+          onChange={(e) => setForm({ ...form, wholesale_price: Number(e.target.value) })}
         />
         <Input
-          label="Cost Per Unit"
+          label="Retail Price"
           type="number"
-          value={String(form.cost_per_unit)}
-          onChange={(e) => setForm({ ...form, cost_per_unit: Number(e.target.value) })}
+          value={String(form.retail_price)}
+          onChange={(e) => setForm({ ...form, retail_price: Number(e.target.value) })}
         />
       </div>
 
@@ -102,8 +102,8 @@ export default function ProductsManager({ initialData }: Props) {
           <thead>
             <tr>
               <th className="p-3">Name</th>
-              <th className="p-3">Unit Price</th>
-              <th className="p-3">Cost</th>
+              <th className="p-3">Wholesale Price</th>
+              <th className="p-3">Retail Price</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
@@ -111,8 +111,8 @@ export default function ProductsManager({ initialData }: Props) {
             {products.map((p) => (
               <tr key={p.id} className="border-t">
                 <td className="p-3">{p.name}</td>
-                <td className="p-3">{p.unit_price}</td>
-                <td className="p-3">{p.cost_per_unit}</td>
+                <td className="p-3">{p.wholesale_price}</td>
+                <td className="p-3">{p.retail_price}</td>
                 <td className="p-3 flex gap-2">
                   <Button onClick={() => handleUpdate(p.id)} variant="secondary">
                     Edit

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { Toaster } from 'react-hot-toast';
+import { PreferencesProvider } from '@/lib/preferences';
 import './globals.css';
 
 /**
@@ -24,7 +26,38 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning className="bg-white text-gray-900">{children}</body>
+      <body suppressHydrationWarning className="bg-white text-gray-900">
+        <PreferencesProvider>
+          <Toaster
+            position="top-right"
+            reverseOrder={false}
+            gutter={8}
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#333',
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                borderRadius: '8px',
+                padding: '16px',
+              },
+              success: {
+                style: {
+                  background: '#DCFCE7',
+                  color: '#166534',
+                },
+              },
+              error: {
+                style: {
+                  background: '#FEE2E2',
+                  color: '#991B1B',
+                },
+              },
+            }}
+          />
+          {children}
+        </PreferencesProvider>
+      </body>
     </html>
   );
 }

@@ -267,7 +267,7 @@ users (Supabase Auth users)
 - Check Supabase status
 - Verify RLS policies allow read access
 - Check browser console for errors
-- Ensure user has correct role in users table
+- Ensure user has correct role in profiles table
 
 **Issue:** Can't create batch
 - Verify batch_products table exists

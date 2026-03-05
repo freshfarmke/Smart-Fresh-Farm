@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 /**
  * RegisterForm Component
  * Uses Supabase Auth for signup
- * Mirrors Display Name in Auth and name in users table
+ * Mirrors Display Name in Auth and name in profiles table
  */
 
 export function RegisterForm() {
@@ -69,11 +69,11 @@ export function RegisterForm() {
         return;
       }
 
-      // Insert into users table
-      const { data: insertedProfile, error: insertError } = await supabase
-        .from('users')
+      // Insert a profile record (stored in `profiles` table)
+      const { error: insertError } = await supabase
+        .from('profiles')
         .insert({
-          id: user.id, // matches UID in Supabase Auth
+          user_id: user.id, // references auth.user.id
           email,
           name, // mirrors Display Name
           role: 'production', // default role for new staff registrations
@@ -87,7 +87,7 @@ export function RegisterForm() {
       }
 
       // Redirect after successful registration
-      setTimeout(() => router.push(ROUTES.PRODUCTION), 800);
+      setTimeout(() => router.push(ROUTES.DASHBOARD), 800);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
