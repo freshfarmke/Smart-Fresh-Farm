@@ -25,12 +25,14 @@ import { getAllProducts } from '@/lib/api/products';
 import { exportProducts } from '@/lib/api/excel-export';
 
 interface Product {
-  id: string;
+  id: number;
   name: string;
-  unit_price?: number;
-  cost_per_unit?: number;
-  category?: string;
-  description?: string;
+  weight: string | null;
+  wholesale_price: number;
+  retail_price: number;
+  active: boolean;
+  created_at: string | null;
+  updated_at?: string | null;
 }
 
 export default function ProductsPage() {
@@ -78,10 +80,10 @@ export default function ProductsPage() {
     try {
       const exportData = products.map(p => ({
         name: p.name,
-        category: p.category || 'N/A',
-        unit_price: p.unit_price || 0,
-        cost_per_unit: p.cost_per_unit || 0,
-        margin: p.unit_price && p.cost_per_unit ? Math.round(((p.unit_price - p.cost_per_unit) / p.unit_price) * 100) : 0,
+        weight: p.weight || 'N/A',
+        wholesale_price: p.wholesale_price || 0,
+        retail_price: p.retail_price || 0,
+        margin: p.retail_price && p.wholesale_price ? Math.round(((p.retail_price - p.wholesale_price) / p.retail_price) * 100) : 0,
       }));
 
       exportProducts(exportData, `products_${new Date().toISOString().split('T')[0]}.csv`);
@@ -148,25 +150,25 @@ export default function ProductsPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left font-semibold text-gray-900">Product Name</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Category</th>
-                  <th className="px-6 py-3 text-right font-semibold text-gray-900">Unit Price</th>
-                  <th className="px-6 py-3 text-right font-semibold text-gray-900">Cost/Unit</th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-900">Weight</th>
+                  <th className="px-6 py-3 text-right font-semibold text-gray-900">Wholesale</th>
+                  <th className="px-6 py-3 text-right font-semibold text-gray-900">Retail</th>
                   <th className="px-6 py-3 text-right font-semibold text-gray-900">Margin %</th>
                   <th className="px-6 py-3 text-left font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {products.map((product) => {
-                  const margin = product.unit_price && product.cost_per_unit
-                    ? Math.round(((product.unit_price - product.cost_per_unit) / product.unit_price) * 100)
+                  const margin = product.retail_price && product.wholesale_price
+                    ? Math.round(((product.retail_price - product.wholesale_price) / product.retail_price) * 100)
                     : 0;
                   
                   return (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
-                      <td className="px-6 py-4 text-gray-600">{product.category || 'N/A'}</td>
-                      <td className="px-6 py-4 text-right text-gray-900 font-medium">₦{product.unit_price?.toLocaleString() || '0'}</td>
-                      <td className="px-6 py-4 text-right text-gray-600">₦{product.cost_per_unit?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-gray-600">{product.weight || 'N/A'}</td>
+                      <td className="px-6 py-4 text-right text-gray-900 font-medium">₦{product.wholesale_price?.toLocaleString() || '0'}</td>
+                      <td className="px-6 py-4 text-right text-gray-600">₦{product.retail_price?.toLocaleString() || '0'}</td>
                       <td className="px-6 py-4 text-right">
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
                           margin >= 30 ? 'bg-green-100 text-green-800' : 

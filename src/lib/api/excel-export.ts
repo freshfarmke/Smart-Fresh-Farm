@@ -273,7 +273,7 @@ export function exportProductionReport(
  */
 export async function exportMultipleSheets(
   sheetsData: ExportData[],
-  filename: string = 'production_report.xlsx'
+  _filename: string = 'production_report.xlsx'
 ): Promise<void> {
   // This is a placeholder for xlsx integration
   // In production, use: npm install xlsx

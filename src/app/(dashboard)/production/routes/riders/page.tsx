@@ -42,7 +42,16 @@ export default function RouteRidersPage() {
       try {
         const response = await getAllRouteRiders();
         if (response.success) {
-          setRiders(response.data || []);
+          // Map RouteRider to Rider interface: full_name -> name
+          const mappedRiders = (response.data || []).map(r => ({
+            id: String(r.id),
+            name: r.full_name,
+            phone: r.phone,
+            email: undefined,
+            status: r.status,
+            created_at: r.created_at,
+          }));
+          setRiders(mappedRiders);
         } else {
           toast.error('Failed to load riders');
         }
@@ -62,7 +71,16 @@ export default function RouteRidersPage() {
     try {
       const response = await getAllRouteRiders();
       if (response.success) {
-        setRiders(response.data || []);
+        // Map RouteRider to Rider interface: full_name -> name
+        const mappedRiders = (response.data || []).map(r => ({
+          id: String(r.id),
+          name: r.full_name,
+          phone: r.phone,
+          email: undefined,
+          status: r.status,
+          created_at: r.created_at,
+        }));
+        setRiders(mappedRiders);
         toast.success('Rider list refreshed');
       }
     } catch (err) {

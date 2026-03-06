@@ -16,7 +16,6 @@ import {
   Leaf,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import clsx from 'clsx';
 import { FinanceSidebar } from '@/components/layout';
 
 const FinanceSettings: React.FC = () => {

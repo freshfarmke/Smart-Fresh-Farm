@@ -3,9 +3,7 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Download, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ShopStockCard } from '@/components/shop/StockCard';
 import { TransferTable } from '@/components/shop/TransferTable';
-import { StockSummary } from '@/components/shop/StockSummary';
 import { TransferHistory } from '@/components/shop/TransferHistory';
 import { getShopStock, getShopTransfers } from '@/lib/api/shop';
 import { getAllProducts } from '@/lib/api/products';
@@ -38,7 +36,6 @@ export default function ShopManagementPage() {
   const [productionStock, setProductionStock] = useState<Record<string, number>>({});
   const [availableProducts, setAvailableProducts] = useState<{ id: string; label: string }[]>([]);
   const [batches, setBatches] = useState<BatchSummary[]>([]);
-  const [allBatches, setAllBatches] = useState<any[]>([]);
 
   const [transfers, setTransfers] = useState<TransferHistoryItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -105,7 +102,6 @@ export default function ShopManagementPage() {
 
         // Map batches
         if (batchesRes.success) {
-          setAllBatches(batchesRes.data || []);
           const summaries: BatchSummary[] = (batchesRes.data || []).map((batch: any) => ({
             batchId: batch.id,
             batchNumber: batch.batch_number,

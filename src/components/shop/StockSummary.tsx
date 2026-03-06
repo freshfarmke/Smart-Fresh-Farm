@@ -1,7 +1,5 @@
 'use client';
 
-import { Clock } from 'lucide-react';
-
 interface StockSummaryProps {
   bread: number;
   queenCakes: number;
@@ -17,4 +15,14 @@ export function StockSummary({ bread, queenCakes, buns, mavin = 0 }: StockSummar
     { label: 'Total Mavin in Shop', value: mavin },
   ];
 
-  }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {summaries.map((item, idx) => (
+        <div key={idx} className="bg-white rounded-lg shadow p-4 border border-gray-100">
+          <p className="text-sm font-medium text-gray-600">{item.label}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">{item.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}

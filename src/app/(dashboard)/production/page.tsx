@@ -29,10 +29,6 @@ export default function ProductionDashboard() {
     router.push('/production/new-batch');
   };
 
-  const handleDispatch = () => {
-    router.push('/production/dispatch');
-  };
-
   useEffect(() => {
     let mounted = true;
     async function loadStats() {

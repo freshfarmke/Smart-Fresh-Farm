@@ -49,17 +49,17 @@ export default function ProductionReportsPage() {
 
     setExporting(true);
     try {
-      const exportData = {
-        metrics: {
-          total_batches: summary.total_batches,
-          total_units_produced: summary.total_units_produced,
-          total_dispatches: summary.total_dispatches,
-          total_units_dispatched: summary.total_units_dispatched,
-          total_returns: summary.total_returns,
-          total_units_returned: summary.total_units_returned,
-        },
-        top_products: summary.top_products || [],
-      };
+      // Convert summary metrics to array format expected by exportProductionReport
+      const exportData = [
+        {
+          date: new Date().toISOString().split('T')[0],
+          batches_created: summary.total_batches || 0,
+          total_produced: summary.total_units_produced || 0,
+          total_dispatched: summary.total_units_dispatched || 0,
+          shop_transfers: 0, // Not available in current summary
+          returns: summary.total_units_returned || 0,
+        }
+      ];
 
       exportProductionReport(exportData, `production_report_${new Date().toISOString().split('T')[0]}.csv`);
       toast.success('Report exported successfully');
