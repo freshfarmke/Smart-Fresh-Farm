@@ -59,14 +59,10 @@ curl -X POST http://localhost:5000/admin/create-user \
 
 ### 5. Start Application (30 seconds)
 ```bash
-# Terminal 1 - Backend
-cd backend
+# Install dependencies
 npm install
-npm run dev
 
-# Terminal 2 - Frontend
-cd frontend
-npm install
+# Start development server
 npm run dev
 
 # Open: http://localhost:3000

@@ -90,7 +90,7 @@ curl -X POST http://localhost:5000/admin/create-user \
 ```
 
 ### Step 5: Test the Dashboard
-1. Start the Next.js frontend: `npm run dev` in `/frontend`
+1. Start the Next.js development server: `npm run dev`
 2. Go to `http://localhost:3000/login`
 3. Login with production account
 4. Should redirect to `/production` dashboard
@@ -141,18 +141,18 @@ users (Supabase Auth users)
 ### New Files
 - `SUPABASE_SCHEMA.sql` - Complete database schema
 - `PRODUCTION_DASHBOARD_README.md` - Detailed documentation
-- `frontend/src/app/(dashboard)/production/new-batch/page.tsx` - Create batch page
-- `frontend/src/app/(dashboard)/production/[id]/page.tsx` - Batch details page
+- `src/app/(dashboard)/production/new-batch/page.tsx` - Create batch page
+- `src/app/(dashboard)/production/[id]/page.tsx` - Batch details page
 
 ### Modified Files
-- `frontend/src/app/(dashboard)/production/page.tsx` - Dashboard overview (complete rewrite)
-- `frontend/src/components/forms/LoginForm.tsx` - Supabase Auth integration
-- `frontend/src/components/forms/RegisterForm.tsx` - Supabase Auth with user role creation
-- `frontend/src/lib/supabase/client.ts` - Supabase client setup
+- `src/app/(dashboard)/production/page.tsx` - Dashboard overview (complete rewrite)
+- `src/components/forms/LoginForm.tsx` - Supabase Auth integration
+- `src/components/forms/RegisterForm.tsx` - Supabase Auth with user role creation
+- `src/lib/supabase/client.ts` - Supabase client setup
 - `backend/src/supabaseAdmin.js` - Admin Supabase client
 - `backend/src/routes/admin.js` - Admin user creation route
 - `backend/src/server.js` - Mount admin routes
-- `frontend/src/app/(auth)/login/page.tsx` - Removed dev-only button
+- `src/app/(auth)/login/page.tsx` - Removed dev-only button
 
 ---
 

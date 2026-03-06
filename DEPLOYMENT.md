@@ -1,10 +1,10 @@
 Vercel Deployment Checklist
 
-This document describes steps to deploy the frontend to Vercel and options for the backend.
+This document describes steps to deploy the bakery management system to Vercel.
 
 1) Frontend (Next.js) — deploy to Vercel
 
-- Confirm `frontend/package.json` has build/start scripts (it does: `next build`, `next start`).
+- Confirm `package.json` has build/start scripts (it does: `next build`, `next start`).
 
 - Required environment variables (set in Vercel project > Settings > Environment Variables):
   - `NEXT_PUBLIC_SUPABASE_URL` — your Supabase project URL
@@ -45,7 +45,7 @@ After `npm ci` completes, run:
 npm run build
 ```
 
-If Vercel reports "No Next.js version detected" make sure `vercel.json` has `rootDirectory: "frontend"` and re-deploy. Ensure environment variables are set in the Vercel project settings rather than committed to source.
+Vercel will auto-detect the Next.js project at the root. Do NOT set `rootDirectory` in `vercel.json` as the project is now at the root. Ensure environment variables are set in the Vercel project settings rather than committed to source.
   - Framework Preset: `Next.js` (Vercel auto-detects this)
   - Build Command: leave blank (Vercel will run `npm install && npm run build` in the detected root). If you prefer explicit: `cd frontend && npm ci && npm run build`.
   - Output directory: leave empty for Next.js (Vercel handles it).
@@ -55,17 +55,15 @@ If Vercel reports "No Next.js version detected" make sure `vercel.json` has `roo
   - Production reports, shop, institutions pages use live Supabase APIs; no mock data left in those flows.
 
 - To deploy from this repo (quick):
-  - Connect repo in Vercel dashboard and point root to this repository. Vercel will detect Next.js and build the `frontend` app.
+  - Connect repo in Vercel dashboard. Vercel will auto-detect the Next.js project at the repository root and build automatically.
 
-2) Backend (Express)
+2) Backend Architecture
 
-Options:
-- Option A — Deploy backend separately (recommended):
-  - Host the `backend` folder on a server (Render, Railway, Fly.io) or a small VPS and set its URL in the frontend (if needed). This keeps the Express app unchanged.
-
-- Option B — Convert to serverless and host on Vercel:
-  - Move API routes into `frontend/src/app/api/*` (Next.js serverless functions) or convert Express to a `serverless-http` wrapper per endpoint.
-  - Pros: single deployment; Cons: requires refactor and testing.
+The system now uses Supabase as the primary backend:
+- All database operations go through Supabase directly (client and server-side via API routes)
+- Next.js API routes (`src/app/api/*`) provide additional endpoints when needed
+- No separate Express backend required
+- This keeps deployment simple: Vercel hosts the entire Next.js application with Supabase connection
 
 3) Database & permissions
 

@@ -1,0 +1,133 @@
+ 'use client';
+
+import { useRouter } from 'next/navigation';
+import { Plus, Layers, Package, Truck, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { StatCard } from '@/components/production/StatCard';
+import { ProductionTable } from '@/components/production/ProductionTable';
+import { ActivityFeed } from '@/components/production/ActivityFeed';
+import { getAllProductionBatches } from '@/lib/api/production';
+import { getAllDispatches } from '@/lib/api/routes';
+import { supabase } from '@/lib/supabase/client';
+
+/**
+ * Production Dashboard
+ * Clean activity-feed based dashboard for production operations
+ */
+
+export default function ProductionDashboard() {
+  const router = useRouter();
+
+  const [stats, setStats] = useState({
+    batchesToday: 0,
+    unitsProducedToday: 0,
+    dispatchesToday: 0,
+    pendingReturns: 0,
+  });
+
+  const handleCreateBatch = () => {
+    router.push('/production/new-batch');
+  };
+
+  const handleDispatch = () => {
+    router.push('/production/dispatch');
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadStats() {
+      try {
+        const pb = await getAllProductionBatches();
+        const d = await getAllDispatches();
+        const { data: returnsData } = await supabase.from('route_returns').select('*');
+
+        const today = new Date().toDateString();
+
+        let batchesToday = 0;
+        let unitsProducedToday = 0;
+        if (pb.success) {
+          (pb.data || []).forEach((b: any) => {
+            const created = b.created_at ? new Date(b.created_at).toDateString() : null;
+            if (created === today) {
+              batchesToday += 1;
+              unitsProducedToday += Number(b.quantity_produced || 0);
+            }
+          });
+        }
+
+        let dispatchesToday = 0;
+        if (d.success) {
+          (d.data || []).forEach((ds: any) => {
+            const dispatchDate = ds.dispatch_date ? new Date(ds.dispatch_date).toDateString() : (ds.created_at ? new Date(ds.created_at).toDateString() : null);
+            if (dispatchDate === today) dispatchesToday += 1;
+          });
+        }
+
+        let pendingReturns = 0;
+        (returnsData || []).forEach((r: any) => {
+          if (!r.status || r.status === 'pending') pendingReturns += 1;
+        });
+
+        if (mounted) setStats({ batchesToday, unitsProducedToday, dispatchesToday, pendingReturns });
+      } catch (err) {
+        console.error('Failed to load production stats', err);
+      }
+    }
+
+    loadStats();
+    return () => { mounted = false; };
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Actions */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Production Dashboard</h1>
+          <p className="text-sm text-gray-600 mt-1">Operational control center</p>
+        </div>
+        <button
+          onClick={handleCreateBatch}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition-colors font-medium shadow-sm"
+        >
+          <Plus className="w-5 h-5" />
+          Create New Batch
+        </button>
+      </div>
+
+      {/* Stats Grid - 4 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Today's Production Batches"
+          value={String(stats.batchesToday)}
+          icon={<Layers className="w-6 h-6" />}
+          color="bg-orange-100 text-orange-600"
+        />
+        <StatCard
+          title="Total Units Produced Today"
+          value={String(stats.unitsProducedToday)}
+          icon={<Package className="w-6 h-6" />}
+          color="bg-blue-100 text-blue-600"
+        />
+        <StatCard
+          title="Total Dispatched Today"
+          value={String(stats.dispatchesToday)}
+          icon={<Truck className="w-6 h-6" />}
+          color="bg-green-100 text-green-600"
+        />
+        <StatCard
+          title="Pending Returns"
+          value={String(stats.pendingReturns)}
+          icon={<RotateCcw className="w-6 h-6" />}
+          color="bg-red-100 text-red-600"
+        />
+      </div>
+
+      {/* Production Table - Full Width */}
+      <ProductionTable />
+
+      {/* Activity Feed */}
+      <ActivityFeed />
+    </div>
+  );
+}

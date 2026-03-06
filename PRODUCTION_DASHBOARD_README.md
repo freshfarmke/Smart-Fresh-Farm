@@ -9,7 +9,7 @@ The Production Dashboard is a fully functional bakery management system built wi
 ## 📁 Project Structure
 
 ```
-frontend/src/
+src/
 ├── app/
 │   ├── (dashboard)/
 │   │   ├── layout.tsx              # Dashboard layout wrapper
@@ -148,12 +148,11 @@ This will:
 
 ### 2. **Update Environment Variables**
 
-Ensure your `.env.local` in the frontend has:
+Ensure your `.env.local` has:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
 
 ### 3. **Enable Required Authentication**
