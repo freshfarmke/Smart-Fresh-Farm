@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui';
 import Link from 'next/link';
-import { ROUTES, APP_CONFIG } from '@/lib/constants';
+import { ROUTES } from '@/lib/constants';
 
 /**
  * Landing Page
