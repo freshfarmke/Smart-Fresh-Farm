@@ -6,8 +6,8 @@
 
 // App metadata
 export const APP_CONFIG = {
-  name: 'Bakery Management',
-  description: 'Professional bakery management system',
+  name: 'Fresh Farm Bakery Flaxs',
+  description: 'Professional bakery management system for Fresh Farm Bakery Flaxs',
   version: '1.0.0',
 };
 
